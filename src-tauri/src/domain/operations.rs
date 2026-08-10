@@ -6,6 +6,7 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 /// What processing to run (architecture.md §9.2 `OperationPlan`; design-02
 /// §4.1 `operations`).
@@ -16,7 +17,7 @@ use serde::{Deserialize, Serialize};
 /// (`JobMode`), which cannot express the contradictory `merge: false,
 /// validate: false` (or `true, true`) states the two-boolean form allowed.
 /// This module follows design-02.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OperationPlan {
     pub mode: JobMode,
@@ -44,7 +45,7 @@ pub struct OperationPlan {
 }
 
 /// `"process" | "validateOnly"` (design-02 §4.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum JobMode {
     Process,
@@ -61,7 +62,7 @@ pub enum JobMode {
 /// copy — they never merely "additionally write" an audit file next to an
 /// unfiltered main output. The two variants produce byte-identical main
 /// outputs; the only difference is whether an audit file exists at all.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum DuplicatePolicy {
     /// No duplicate handling: emit neither `-d` nor `-D`.
@@ -82,7 +83,7 @@ pub enum DuplicatePolicy {
 /// Design-02 explicitly drops this from V1 (row 12, Decision D-13: "V1 emits
 /// no ... `-7`/`--notags`"); it is capability-map-only, never wired to a
 /// `JobSpec` field. This module follows design-02 and omits the field.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CleanupOptions {
     pub remove_comments: bool,
@@ -108,7 +109,7 @@ pub struct CleanupOptions {
 /// non-matching file); with it they land in the *main* output. Making the
 /// impossible option unrepresentable (rather than accepting it and silently
 /// downgrading it) is the enforcement mechanism for architecture.md §29 here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum BrokenOutput {
     /// Default: broken games are dropped (no `--keepbroken`).
@@ -118,7 +119,7 @@ pub enum BrokenOutput {
 }
 
 /// ECO/opening classification (`-e<eco.pgn>`) toggle (design-02 §4.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EcoOptions {
     pub enabled: bool,
@@ -137,7 +138,7 @@ pub struct EcoOptions {
 /// exact `-W<fmt>` spelling was not part of the source citations available
 /// for this task, and inventing one would violate the project's
 /// never-invent rule (DECISIONS-LEDGER.md header).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum OutputNotation {
     San,

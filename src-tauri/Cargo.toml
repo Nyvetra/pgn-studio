@@ -19,12 +19,25 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# NOTE (Phase 0): only the `tauri` core is depended on. The scaffold's
-# default `tauri-plugin-opener` was intentionally dropped to keep the
-# capability surface minimal per architecture.md §16.3 - nothing in Phase 0
-# needs to open external URLs/paths. Re-add a scoped plugin (or a narrow
-# Rust `open_path`/`reveal_path` command) only when a real screen needs it.
-tauri = { version = "2", features = [] }
+# NOTE (Phase 0): only the `tauri` core was depended on then; Phase 2a now
+# re-adds the dialog/opener plugins below because `select_input_files` /
+# `select_output_directory` / `reveal_path` / `open_path` are real commands
+# now (design-02 §4.1, architecture.md §16.3). Both plugins are called only
+# from Rust command handlers (never invoked directly by the frontend), and
+# `reveal_path`/`open_path` additionally allowlist-check every path against
+# job history/artifacts before calling the plugin (see `commands::dialogs`).
+tauri = { version = "2", features = ["specta"] }
+# Phase 2a: native file/folder pickers for the Files/Output screens. The
+# frontend never calls this plugin directly - `select_input_files` etc. are
+# our own commands that call the plugin's Rust API and re-validate every
+# returned path (architecture.md §16.2: the frontend is outside the trust
+# boundary).
+tauri-plugin-dialog = "2"
+# Phase 2a: "reveal in file manager" / "open with default app" for
+# `reveal_path`/`open_path`. Same rule: Rust-mediated only, and every path is
+# checked against an allowlist derived from job history/artifacts before
+# being handed to the plugin (never an arbitrary frontend-supplied path).
+tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1.24.0", features = ["v4", "serde"] }
@@ -49,6 +62,16 @@ tracing = "0.1"
 # mechanism design-02 names ("the same-file crate's Handle, or direct
 # windows-sys calls").
 same-file = "1.0.6"
+# Phase 2a (commands/, design-02 §4.3, D-17): Rust-to-TypeScript type
+# generation for the IPC command/event surface. Pinned to exact prerelease
+# versions because tauri-specta/specta have not cut a stable 2.0.0 yet
+# (verified against crates.io on 2026-08-10: latest is 2.0.0-rc.25, and
+# tauri-specta 2.0.0-rc.25 requires specta =2.0.0-rc.25 exactly). Verified
+# compatible with the installed tauri 2.11.5: tauri 2.11.5 defines the
+# `specta` feature tauri-specta's own manifest requests.
+specta = { version = "=2.0.0-rc.25", features = ["derive", "chrono", "uuid"] }
+specta-typescript = "=0.0.12"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 
 [target.'cfg(windows)'.dependencies]
 # Phase 1b: Job Objects for Windows process-tree control (§2.2, §2.5),
@@ -75,4 +98,12 @@ libc = "0.2"
 # and destination directories that must not collide with the real
 # filesystem or with each other across parallel test threads.
 tempfile = "3"
+
+# Phase 2a: `xtask` (design-02 §4.3/D-17) regenerates `src/ipc/generated-types.ts`
+# via `cargo run -p xtask -- export-bindings`. `src-tauri` is both the app
+# package and the workspace root (a standard Cargo "root package + members"
+# workspace) so this stays a plain subdirectory of `src-tauri/`, not a
+# separate top-level Rust project.
+[workspace]
+members = ["xtask"]
 

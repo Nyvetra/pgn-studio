@@ -61,3 +61,17 @@ jobs:
 
       - name: Test
         run: cargo test
+
+      - name: Check generated TypeScript bindings are up to date (design-02 §4.3/D-17)
+        # Regenerates src/ipc/generated-types.ts (via `xtask export-bindings`,
+        # which shells out to the real `pgn-studio` binary with
+        # `--export-bindings` - see src-tauri/src/lib.rs::run's doc comment
+        # for why it does not link pgn_studio_lib into a second binary
+        # crate directly) and fails if the committed file would change. Runs
+        # on every OS in the matrix: it needs no engine sidecar and no GUI/
+        # webview initialization (the flag short-circuits before
+        # `tauri::Builder`/`application::startup::initialize` are ever
+        # constructed), so it is a genuinely portable, fast check.
+        run: |
+          cargo run -p xtask -- export-bindings
+          git diff --exit-code -- ../src/ipc/generated-types.ts

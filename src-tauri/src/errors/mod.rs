@@ -530,6 +530,34 @@ pub fn job_not_active(requested: Uuid, currently_active: Option<Uuid>) -> Public
 }
 
 // ---------------------------------------------------------------------
+// PATH_NOT_ALLOWED (Phase 2a addition, mapped onto INVALID_JOB_SPEC)
+// ---------------------------------------------------------------------
+
+/// Raised by: `reveal_path`/`open_path`'s allowlist check (design-02 §4.1:
+/// "only paths that appear in job history/artifacts"). `PATH_NOT_ALLOWED`
+/// is not itself a member of the closed §18.1 taxonomy; like
+/// [`job_not_active`] does for an unknown job id, this reuses
+/// `ErrorCode::InvalidJobSpec` for "the request parameter you gave me is
+/// rejected" rather than inventing a 20th taxonomy member.
+pub fn path_not_allowed(path: &Path) -> PublicError {
+    PublicError::from_redacted_parts(
+        ErrorCode::InvalidJobSpec,
+        "Path not allowed",
+        format!(
+            "\"{}\" is not a known job input or output path.",
+            display_path(path)
+        ),
+        Some(
+            "Only files and folders from a job's own inputs or outputs can be revealed or \
+             opened this way."
+                .to_string(),
+        ),
+        None,
+        new_technical_id(),
+    )
+}
+
+// ---------------------------------------------------------------------
 // JOB_CANCELLED
 // ---------------------------------------------------------------------
 

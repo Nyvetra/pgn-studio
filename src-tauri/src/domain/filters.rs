@@ -4,10 +4,11 @@
 //! §9.2, §13.4; design-02 §1.3 rows 19-26, §1.5.1, §4.1, D-10, D-20).
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 /// Filter criteria for a job (architecture.md §9.2 `FilterPlan`; design-02
 /// §4.1 `filters`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FilterPlan {
     /// Tag/metadata criteria, rendered into `criteria/tags.txt` and passed
@@ -47,7 +48,7 @@ pub struct FilterPlan {
 
 /// One tag/metadata criterion line (design-02 §1.5.1 grammar:
 /// `<TagName> [<op>] "<value>"`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TagRule {
     pub tag: TagName,
@@ -75,7 +76,7 @@ pub struct TagRule {
 /// `other` catch-all (design-02 §4.3) — so the honest resolution is a
 /// smaller-but-real closed enum, not a falsely-complete one or an
 /// escape-hatch string.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "PascalCase")]
 pub enum TagName {
     Event,
@@ -127,7 +128,7 @@ impl TagName {
 /// UI wording for [`TagOp::Prefix`] must say "starts with", not "equals" —
 /// `strncmp`-based prefix matching means `Tal` matches `Talbot` (design-02
 /// §1.5.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum TagOp {
     /// No operator: prefix ("starts with") match.
@@ -168,7 +169,7 @@ impl TagOp {
 /// `engine::command_compiler` (design-02 §0 finding 3, D-007 V-3, canonical
 /// order rule O-6b), because it is a property of argv construction, not of
 /// this data.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MoveBounds {
     pub min: Option<u32>,
@@ -176,7 +177,7 @@ pub struct MoveBounds {
 }
 
 /// SetUp/FEN starting-position policy (design-02 row 26).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum SetupPolicy {
     /// Neither flag: games may start from the standard position or a
@@ -189,7 +190,7 @@ pub enum SetupPolicy {
 }
 
 /// A FEN-pattern position filter (design-02 row 23, §1.5.1 rendering map).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FenPatternFilter {
     pub pattern: String,

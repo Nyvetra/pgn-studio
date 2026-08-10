@@ -25,6 +25,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use uuid::Uuid;
 
 use crate::domain::{
@@ -56,7 +57,7 @@ pub struct DraftManifest {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FinalStatus {
     Succeeded,
@@ -64,7 +65,14 @@ pub enum FinalStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Serialize)]
+/// `Deserialize`/`Type` (Phase 2a addition): `application::jobs::get_job`
+/// reads a completed job's `FinalManifest` back from
+/// `<jobs_root>/<job_id>/manifest.json` to answer `get_job` for a
+/// non-active job, and returns records of this exact shape to the frontend.
+/// This module's own doc comment already anticipated exactly this
+/// ("nothing in this codebase reads it back (that is a future
+/// history/persistence feature)").
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WarningRecord {
     pub code: ErrorCode,
@@ -80,7 +88,9 @@ impl From<&JobWarning> for WarningRecord {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+/// See [`WarningRecord`]'s doc comment for why this now derives
+/// `Deserialize`/`Type` too.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ErrorRecord {
     pub code: ErrorCode,
@@ -105,7 +115,13 @@ impl From<&PublicError> for ErrorRecord {
 /// Written to `<ws>/manifest.draft.json` then atomically promoted to
 /// `<ws>/manifest.json` **last**, after every artifact in `artifacts` has
 /// already been published (design-02 §3.4 step 7).
-#[derive(Debug, Clone, Serialize)]
+///
+/// `Deserialize` (Phase 2a addition): `application::jobs::get_job` reads
+/// this back to answer `get_job` for a job that is no longer active - see
+/// [`WarningRecord`]'s doc comment. Never re-serialized to
+/// `manifest.json` (that write path is still `write_final_manifest`'s
+/// alone) - this is a read-only consumer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FinalManifest {
     pub schema_version: u32,

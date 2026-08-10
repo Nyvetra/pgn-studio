@@ -1,7 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Phase 0 minimal capability set for the main window: only Tauri's safe core defaults (window/app/event/resource basics needed for the webview to function and for app-defined #[tauri::command] functions such as get_app_info to be invoked). No dialog, filesystem, shell, or sidecar-execute permissions are granted yet. See src-tauri/binaries/README.md and engine-src/README.md: a scoped shell:allow-execute permission for the named pgn-extract sidecar (architecture.md §16.3) must be added in Phase 1, together with narrowly-scoped app-config/app-cache filesystem access and the dialog permissions the Files screen needs - never broad shell or filesystem access.",
+  "description": "Phase 2a capability set for the main window (architecture.md §16.3): only the safe core defaults (window/app/event/resource basics, which already include event listen/emit - core:default composes core:event:default) plus the three plugin permissions the IPC command surface genuinely needs. The dialog and opener plugins are called only from Rust command handlers (select_input_files/select_input_directory/select_output_directory, reveal_path, open_path) - never invoked directly by the frontend - and every reveal_path/open_path call is additionally allowlist-checked in Rust against job history/artifacts before the plugin is called (application::paths::resolve_allowed_path). No shell execution, no arbitrary command spawning, and no broad filesystem access are granted; the sidecar is invoked only via the engine module's own verified-path resolver, which the webview cannot name or reach.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "opener:allow-open-path",
+    "opener:allow-reveal-item-in-dir"
+  ]
 }

@@ -6,9 +6,10 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 /// Where and how to publish job outputs (design-02 §4.1 `output`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OutputPlan {
     /// User-selected destination directory, as typed/browsed in the UI.
@@ -59,7 +60,7 @@ pub struct OutputPlan {
 ///
 /// See the field doc on [`OutputPlan::duplicate_games`] for how this
 /// interacts with `OperationPlan::duplicates`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum DuplicateOutput {
     None,
@@ -71,7 +72,7 @@ pub enum DuplicateOutput {
 /// choice on the spec; acting on it (numeric-suffix search, recycle-bin
 /// replacement, no-replace atomic rename) is filesystem I/O and belongs to
 /// Phase 1b (design-02 §3.4 step 6).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ConflictPolicy {
     Fail,
@@ -87,7 +88,7 @@ pub enum ConflictPolicy {
 /// the Phase 1a task scope and architecture.md §7.1's "dependencies point
 /// inward" rule (the engine module may depend on this domain type; the
 /// domain must never depend on the engine module).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ArtifactKind {
     UniqueGames,
@@ -105,7 +106,7 @@ pub enum ArtifactKind {
 /// the minimum needed to describe "what got written, and how big is it" for
 /// history/manifest display. Populating it is Phase 1b's job (it requires a
 /// `stat` call after publication); Phase 1a only defines the shape.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputArtifact {
     pub kind: ArtifactKind,

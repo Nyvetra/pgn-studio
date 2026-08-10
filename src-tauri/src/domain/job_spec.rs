@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use uuid::Uuid;
 
 use super::{FilterPlan, OperationPlan, OutputPlan, RuntimeOptions};
@@ -23,7 +24,7 @@ pub const CURRENT_SCHEMA_VERSION: u32 = 1;
 /// "wire" vs "domain" type in this codebase, so `#[serde(deny_unknown_fields)]`
 /// on every nested struct is load-bearing: it is the only thing standing
 /// between a typo'd frontend field and that field being silently ignored.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct JobSpec {
     pub schema_version: u32,
@@ -47,7 +48,7 @@ pub struct JobSpec {
 /// filesystem probing the pure compiler must never perform. `JobSpec.inputs`
 /// carries only what the compiler actually needs: a path and its retention
 /// priority.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct InputFile {
     pub path: PathBuf,

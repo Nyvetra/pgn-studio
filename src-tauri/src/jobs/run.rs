@@ -239,6 +239,7 @@ pub async fn run_job(
         cancel_rx,
         sink,
         &seq,
+        empty_metrics(&spec, input_bytes),
     )
     .await;
 

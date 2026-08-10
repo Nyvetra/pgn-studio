@@ -25,6 +25,7 @@ use std::time::Duration;
 use tokio::io::AsyncReadExt;
 
 use super::events::{JobEventSink, JobStage, LogLevel};
+use crate::domain::ProcessingMetrics;
 use crate::engine::command_compiler::CompiledEngineCommand;
 
 /// Both `\n` and `\r` end a line (design-02 §2.2's line-splitting rule).
@@ -86,6 +87,26 @@ fn parse_final_summary(line: &str) -> Option<(u64, u64)> {
         .or_else(|| left.strip_suffix(" game"))?;
     let matched: u64 = matched_str.parse().ok()?;
     Some((matched, total))
+}
+
+/// Builds the live [`ProcessingMetrics`] snapshot to emit on a `job://metrics`
+/// event for one `Games: N` progress tick (design-02 §2.3/§4.2: "throttled
+/// `job://metrics`"). `base` carries the fields already known before the
+/// engine was spawned (`input_files`/`input_bytes`, per design-02 §2.4 -
+/// "always" derivable, so the caller passes them in rather than this
+/// function guessing or defaulting them); every other optional field of
+/// `base` is expected to be `None` (not derivable until the run finishes) and
+/// is passed through unchanged - only `processed_games` is overwritten.
+///
+/// No additional debouncing is applied here beyond what the engine itself
+/// already provides: progress ticks arrive at most once per 1000 games
+/// (`grammar.c:1369`, cited in design-02 §2.2), which is the throttling
+/// design-02 asks for.
+fn live_metrics_for_tick(base: ProcessingMetrics, processed_games: u64) -> ProcessingMetrics {
+    ProcessingMetrics {
+        processed_games: Some(processed_games),
+        ..base
+    }
 }
 
 pub(crate) fn classify_line(line: &str) -> ClassifiedLine {
@@ -217,12 +238,18 @@ const CANCEL_GRACE: Duration = Duration::from_secs(3);
 /// `cancel_rx` observes `true` exactly once, when `cancel_job` is called
 /// for this run (design-02 §2.5 step 1 happens in the caller, before this
 /// is ever invoked - `run_engine` only implements steps 2-6).
+///
+/// `base_metrics` carries the pre-spawn-known fields (`input_files`/
+/// `input_bytes`) used to fill out each live `job://metrics` event fired on
+/// a progress tick (see [`live_metrics_for_tick`]); the caller (`jobs::run`)
+/// already computes these before spawning.
 pub(crate) async fn run_engine(
     compiled: &CompiledEngineCommand,
     log_path: &Path,
     mut cancel_rx: tokio::sync::watch::Receiver<bool>,
     sink: &dyn JobEventSink,
     seq: &AtomicU64,
+    base_metrics: ProcessingMetrics,
 ) -> std::io::Result<EngineRunResult> {
     let mut cmd = crate::engine::process::build_command(
         &compiled.executable,
@@ -305,6 +332,10 @@ pub(crate) async fn run_engine(
                         match classify_line(&line) {
                             ClassifiedLine::Progress { processed_games } => {
                                 last_progress = Some(processed_games);
+                                sink.metrics(
+                                    seq.fetch_add(1, Ordering::SeqCst),
+                                    &live_metrics_for_tick(base_metrics, processed_games),
+                                );
                             }
                             ClassifiedLine::FinalSummary { matched, total } => {
                                 final_summary = Some((matched, total));
@@ -483,6 +514,32 @@ mod tests {
             ClassifiedLine::Diagnostic
         );
         assert_eq!(classify_line(""), ClassifiedLine::Diagnostic);
+    }
+
+    #[test]
+    fn live_metrics_for_tick_overwrites_only_processed_games() {
+        let base = ProcessingMetrics {
+            input_files: 3,
+            input_bytes: 12_345,
+            processed_games: None,
+            input_games: None,
+            output_games: None,
+            duplicate_games: None,
+            broken_games: None,
+            output_bytes: None,
+        };
+        let live = live_metrics_for_tick(base, 2000);
+        assert_eq!(live.processed_games, Some(2000));
+        // Every pre-spawn-known field is carried through unchanged, and
+        // every not-yet-derivable field stays None - never a guessed 0
+        // (design-02 §2.4's binding "never substitute 0" rule).
+        assert_eq!(live.input_files, base.input_files);
+        assert_eq!(live.input_bytes, base.input_bytes);
+        assert_eq!(live.input_games, None);
+        assert_eq!(live.output_games, None);
+        assert_eq!(live.duplicate_games, None);
+        assert_eq!(live.broken_games, None);
+        assert_eq!(live.output_bytes, None);
     }
 
     #[test]

@@ -2,9 +2,10 @@
 //! [`RuntimeOptions`] (design-02 §4.1 `runtime`, §1.3 row 5, §2.4).
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 /// Execution-engine tuning that is not a filter or cleanup choice.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeOptions {
     /// `-Z`: use a disk-backed duplicate table instead of in-memory hashing

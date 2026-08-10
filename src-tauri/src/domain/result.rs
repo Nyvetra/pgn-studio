@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use uuid::Uuid;
 
 use super::{EngineIdentity, OutputArtifact};
@@ -24,7 +25,7 @@ use super::{EngineIdentity, OutputArtifact};
 /// runtime state"). A [`JobResult`] is only ever produced for a job that
 /// reached `Running`, so those frontend-local states have no representation
 /// here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum JobStatus {
     Running,
@@ -48,7 +49,7 @@ pub enum JobStatus {
 /// progress reporting, so design-02 adds this optional field for the
 /// in-flight `Games: N` tick count (as opposed to `input_games`, which is
 /// only known from the *final* summary line after the process exits 0).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProcessingMetrics {
     pub input_files: u64,
@@ -77,7 +78,7 @@ pub struct ProcessingMetrics {
 /// needs the closed set to exist so [`JobResult`], [`PublicError`], and
 /// [`JobWarning`] can be typed completely rather than with a placeholder
 /// `String`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ErrorCode {
     InputNotFound,
@@ -133,7 +134,7 @@ pub enum ErrorCode {
 /// `Deserialize` would reopen exactly the bypass this design closes — any
 /// code could reconstruct an arbitrary `PublicError` via
 /// `serde_json::from_str` instead of a struct literal.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PublicError {
     code: ErrorCode,
@@ -205,7 +206,7 @@ impl PublicError {
 /// `message` is just as user-facing as an error's, so it goes through the
 /// same redaction discipline in `crate::errors` rather than being built
 /// ad hoc wherever a warning is noticed.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct JobWarning {
     code: ErrorCode,
@@ -238,7 +239,7 @@ impl JobWarning {
 /// dropping the derive (rather than just omitting `deny_unknown_fields`,
 /// Phase 1a's approach) makes that true at the type level, and is required
 /// anyway once `PublicError`/`JobWarning` stop being `Deserialize`.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct JobResult {
     pub job_id: Uuid,

@@ -112,7 +112,14 @@ fn hash_file_sync(path: &Path) -> std::io::Result<String> {
 /// Streams the sidecar's SHA-256 on a blocking-pool thread (the file is
 /// ~400 KiB today, but this must not assume "small" - the same pattern
 /// would apply to a much larger future binary without changing callers).
-async fn hash_file_streaming(path: &Path) -> std::io::Result<String> {
+///
+/// `pub(crate)` (Phase 2a addition): `application::inputs::inspect_inputs`
+/// (design-02 §4.1's optional `sha256` on `InputInspectionDto`, gated by
+/// `settings.hashInputs`) reuses this exact streamed-hash routine rather
+/// than duplicating it, so there is one tested implementation of
+/// "streamed SHA-256 of an arbitrary-size file on a blocking-pool thread"
+/// in the crate, not two.
+pub(crate) async fn hash_file_streaming(path: &Path) -> std::io::Result<String> {
     let owned = path.to_path_buf();
     match tokio::task::spawn_blocking(move || hash_file_sync(&owned)).await {
         Ok(inner) => inner,

@@ -8,13 +8,25 @@
 //! layer implements it by calling `app_handle.emit(...)`. [`NullEventSink`]
 //! lets this module (and its tests) run without any listener.
 
+use serde::Serialize;
+use specta::Type;
+
 use crate::domain::{JobResult, JobStatus, OutputArtifact, ProcessingMetrics};
 
 /// design-02 §2.3's stage sequence: `preparing` (workspace + criteria files
 /// written) -> `starting` (spawn) -> `processing` (first stderr bytes, or
 /// 500 ms after spawn) -> `finalizing` (exit observed; postflight +
 /// publication) -> terminal.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// `Serialize`/`Type` (Phase 2a addition): Phase 1b deliberately kept this
+/// wire-format-free ("Phase 1b explicitly does not build Tauri commands or
+/// events - that is Phase 2", this module's own doc comment above) - the
+/// derives are added here, at the type's single definition site, rather
+/// than via a second mirror type in `commands/`, for the same
+/// single-source-of-truth reason the rest of the domain model does this
+/// (design-02 §4.3/D-17).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub enum JobStage {
     Preparing,
     Starting,
@@ -33,7 +45,8 @@ impl JobStage {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub enum LogLevel {
     Info,
     Warn,

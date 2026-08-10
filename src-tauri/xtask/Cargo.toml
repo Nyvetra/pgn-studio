@@ -1,0 +1,24 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-or-later"
+description = "Developer tasks for PGN Studio. Currently: `export-bindings`, which regenerates src/ipc/generated-types.ts by running the real pgn-studio binary with --export-bindings (see src/lib.rs::run's doc comment for why this shells out rather than linking pgn_studio_lib directly)."
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+# Deliberately zero dependencies (Phase 2a note): an earlier version of this
+# crate depended on `pgn-studio`/`tauri`/`tauri-specta`/`specta-typescript`
+# directly and called `pgn_studio_lib::commands::specta_builder()` in-process.
+# That reproduced a confirmed, unresolved upstream Windows-only bug
+# (tauri-apps/tauri#13948): a second binary crate in the same Cargo
+# workspace that imports a Tauri app crate as a library dependency crashes
+# at process startup with STATUS_ENTRYPOINT_NOT_FOUND (0xC0000139) before
+# `main` even runs. `src/main.rs` now shells out to the real, already-
+# working `pgn-studio` binary instead (`cargo run --bin pgn-studio --
+# --export-bindings`), which sidesteps the broken direct-link scenario
+# entirely and needs nothing beyond `std::process::Command`.
+[dependencies]

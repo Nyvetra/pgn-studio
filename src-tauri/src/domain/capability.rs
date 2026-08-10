@@ -11,11 +11,12 @@
 //! ("static capability map") describes.
 
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use super::OutputNotation;
 
 /// Identity of a verified `pgn-extract` sidecar build (design-02 §1.7).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineIdentity {
     /// The engine's own `CURRENT_VERSION` string, e.g. `"v26-06"`.
@@ -37,7 +38,7 @@ pub struct EngineIdentity {
 /// struct is populated from a tested static map for the pinned build
 /// (`engine::capability`), cross-checked at startup against the running
 /// binary's identity (Phase 1b concern; not implemented here).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineCapabilities {
     pub identity: EngineIdentity,
