@@ -1,0 +1,9 @@
+[Event "Illegal Move Test"]
+[Site "Fixture Lab"]
+[Date "2026.01.16"]
+[Round "1"]
+[White "Chen, Chao"]
+[Black "Dubois, Denise"]
+[Result "*"]
+
+1. e4 e5 2. Nf3 Nc6 3. Nc4 Nf6 *

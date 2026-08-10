@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Rust CI: format check, Clippy, and `cargo test` for the src-tauri crate.
+#
+# Per architecture.md §21.1, the target CI matrix is Windows x64, macOS
+# Apple Silicon, and macOS Intel. Only the Windows job has actually been
+# run/verified so far (this project's development environment is Windows).
+# The macOS jobs are present and genuinely execute, but are marked
+# `unverified: true` (continue-on-error) until someone confirms them on
+# real macOS hardware/runners - do not assume they are green. This job
+# intentionally does not attempt a full `tauri build`/bundle step (that
+# needs platform-specific signing/bundling setup that is Phase 6 scope);
+# it only checks that the Rust code itself is well-formed and correct.
+name: Rust
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: rust-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: src-tauri
+
+jobs:
+  fmt-clippy-test:
+    name: >-
+      ${{ matrix.os }}${{ matrix.unverified && ' (unverified - not yet run on real macOS)' || '' }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.unverified }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            unverified: false
+          - os: macos-14 # Apple Silicon, per architecture.md §21.1
+            unverified: true
+          - os: macos-13 # Intel, per architecture.md §21.1
+            unverified: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Format check (cargo fmt)
+        run: cargo fmt --check
+
+      - name: Lint (Clippy, warnings denied)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test

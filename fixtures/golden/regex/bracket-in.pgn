@@ -1,0 +1,29 @@
+[Event "PGN Studio TRE Fixture"]
+[Site "Fixture Lab"]
+[Date "2026.01.01"]
+[Round "1"]
+[White "Petrosian"]
+[Black "Botvinnik"]
+[Result "1/2-1/2"]
+
+1. c4 e5 2. Nc3 Nf6 3. Nf3 Nc6 1/2-1/2
+
+[Event "PGN Studio TRE Fixture"]
+[Site "Fixture Lab"]
+[Date "2026.01.01"]
+[Round "2"]
+[White "Fischer"]
+[Black "Smyslov"]
+[Result "1-0"]
+
+1. e4 c6 2. d4 d5 3. Nc3 dxe4 1-0
+
+[Event "PGN Studio TRE Fixture"]
+[Site "Fixture Lab"]
+[Date "2026.01.01"]
+[Round "3"]
+[White "Karpov"]
+[Black "Euwe"]
+[Result "1-0"]
+
+1. Nf3 d5 2. g3 Nf6 3. Bg2 e6 1-0

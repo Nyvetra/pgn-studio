@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Explicit, justified skip list for scripts/verify-engine.ps1 Layer 2 (upstream test/Makefile suite). Every entry here MUST have a written reason - this file exists so an environment-sensitive upstream test can be excluded from the pass/fail count WITHOUT that exclusion being silent (architecture.md §29: never silently weaken a check). Do not add an entry to make a genuine regression disappear; only for tests that are proven environment-sensitive rather than wrong.",
+  "skips": []
+}

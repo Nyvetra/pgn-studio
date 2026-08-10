@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "PGN Studio supplemental golden fixtures proving the platform regex engine behind pgn-extract's =~ tag-criteria operator (taglines.c/lists.c) and the fixed odds-game pattern (grammar.c check_for_odds) are actually wired in and functioning - the upstream test/ suite has NO =~ coverage at all (verified: `grep '=~' test/` finds nothing). On Windows this proves TRE v0.9.0 is live, not just linked. Consumed by scripts/verify-engine.ps1's supplemental-goldens layer.",
+  "criteriaFileEncoding": "UTF-8, no BOM, LF line endings - a BOM makes pgn-extract silently ignore every criterion in the file (verified during Phase 0b).",
+  "cases": [
+    {
+      "name": "literal",
+      "description": "Unanchored literal substring match via =~ (BRE with no metacharacters). 'Capa' matches anywhere in the White value.",
+      "input": "literal-in.pgn",
+      "criteria": "literal-criteria.txt",
+      "args": [],
+      "expected": "literal-expected.pgn"
+    },
+    {
+      "name": "anchors",
+      "description": "^...$ anchors constrain =~ to a full-string match. 'Tal' matches exactly; 'Taljunior' must NOT match even though it starts with 'Tal', distinguishing anchored from unanchored matching.",
+      "input": "anchors-in.pgn",
+      "criteria": "anchors-criteria.txt",
+      "args": [],
+      "expected": "anchors-expected.pgn"
+    },
+    {
+      "name": "bracket",
+      "description": "Bracket expression [BS] in =~ selects multiple games (Black starting with B or S), excluding a third that starts with neither.",
+      "input": "bracket-in.pgn",
+      "criteria": "bracket-criteria.txt",
+      "args": [],
+      "expected": "bracket-expected.pgn"
+    },
+    {
+      "name": "star",
+      "description": "Kleene star (zero-or-more) in =~: ^AB*C$ matches 'AC' (zero B) and 'ABC' (one B), not 'AXC'.",
+      "input": "star-in.pgn",
+      "criteria": "star-criteria.txt",
+      "args": [],
+      "expected": "star-expected.pgn"
+    },
+    {
+      "name": "backref",
+      "description": "Escaped group \\( \\) with backreference \\1 in =~: ^\\(.\\).*\\1$ matches only when the Event value's first and last characters are identical ('abcba'), not when they differ ('abcde'). Deliberately avoids GNU BRE alternation (\\|), which the design explicitly flags as a portability risk across POSIX BRE engines (TRE vs glibc vs BSD libc) - backreferences are core POSIX BRE (IEEE Std 1003.1-2001), which TRE targets.",
+      "input": "backref-in.pgn",
+      "criteria": "backref-criteria.txt",
+      "args": [],
+      "expected": "backref-expected.pgn"
+    },
+    {
+      "name": "odds",
+      "description": "The OTHER regex call site (grammar.c check_for_odds, not taglines.c/lists.c): a fixed internal pattern ^[^/]*/[^/]*/8/8/8/8/ tested against the FEN tag under --odds. A queen-odds starting position (empty ranks 6-3) matches; a lone-kings mid-board endgame position (king on rank 6) does not. No criteria file - --odds is a plain flag.",
+      "input": "odds-in.pgn",
+      "criteria": null,
+      "args": ["--odds"],
+      "expected": "odds-expected.pgn"
+    }
+  ]
+}

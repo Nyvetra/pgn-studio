@@ -1,0 +1,9 @@
+[Event "Malformed Quotes Test]
+[Site "Fixture Lab"]
+[Date "2026.01.15"]
+[Round "1"]
+[White "O'Brien, Sean"]
+[Black "Nguyen, Linh"]
+[Result "*"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 *

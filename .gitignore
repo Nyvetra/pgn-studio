@@ -1,0 +1,63 @@
+# --- Node / frontend ---------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Test / coverage output
+coverage/
+.vitest-cache/
+
+# --- Rust / Cargo --------------------------------------------------------
+# src-tauri/target and src-tauri/gen/schemas are also covered by
+# src-tauri/.gitignore; repeated here so `git status` is unambiguous when
+# run from the repository root.
+target/
+**/*.rs.bk
+
+# --- Tauri -----------------------------------------------------------------
+# Never commit built sidecar binaries - only the build recipe
+# (engine-src/upstream.lock, scripts/build-pgn-extract.*) is tracked.
+# This also covers the metadata scripts/build-pgn-extract.* generates
+# next to the binary (checksums.json, build-info-<triple>.json,
+# verify-report-<triple>.json, verify-upstream-suite-<triple>.log) -
+# these are regenerated fresh on every build/verify run and always
+# describe the (never-committed) binary sitting next to them, so
+# committing a stale copy would be actively misleading.
+src-tauri/binaries/*
+!src-tauri/binaries/README.md
+
+# --- Engine build cache ------------------------------------------------
+# Fetched pgn-extract/TRE sources and intermediate object files used by
+# scripts/build-pgn-extract.ps1/.sh. Safe to delete at any time - a
+# missing cache is simply re-cloned/rebuilt from engine-src/upstream.lock.
+engine-src/.build/
+
+# --- Environment / secrets (none exist yet - hygiene for later) --------
+.env
+.env.local
+.env.*.local
+
+# --- OS cruft ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editors ---------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

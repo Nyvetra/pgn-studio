@@ -1,0 +1,16 @@
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "2026.01.09"]
+[Round "1"]
+[White "Ostrowski, Olga"]
+[Black "Petrov, Pavel"]
+[Result "1-0"]
+
+1. e4 {A comment containing [square brackets], which normally mark tag
+pairs, to make sure the parser treats them as ordinary text once inside a
+comment.} e5 2. Nf3 {Non-Latin text follows: Привет мир (Russian), 你好世界
+(Chinese), नमस्ते दुनिया (Hindi), দাবা খেলা (Bengali for "chess game"),
+مرحبا بالعالم (Arabic), and some emoji: ♞♛♚.} Nc6 3. Bc4 {A comment that
+contains (parentheses that look like a variation marker) as plain text -
+PGN comments do not nest or contain movetext, so these parentheses must be
+treated literally, not as the start of a RAV variation.} Bc5 1-0

@@ -1,0 +1,78 @@
+[package]
+name = "pgn-studio"
+version = "0.1.0"
+description = "PGN Studio: inspect, validate, consolidate, filter, clean, deduplicate, and export chess games stored in PGN."
+authors = ["Nyvetra"]
+license = "GPL-3.0-or-later"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "pgn_studio_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# NOTE (Phase 0): only the `tauri` core is depended on. The scaffold's
+# default `tauri-plugin-opener` was intentionally dropped to keep the
+# capability surface minimal per architecture.md §16.3 - nothing in Phase 0
+# needs to open external URLs/paths. Re-add a scoped plugin (or a narrow
+# Rust `open_path`/`reveal_path` command) only when a real screen needs it.
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1.24.0", features = ["v4", "serde"] }
+chrono = { version = "0.4.45", features = ["serde"] }
+sha2 = "0.11.0"
+thiserror = "2.0.19"
+# Phase 1b (job orchestration, §2.2): process spawn, concurrent pipe
+# draining, bounded log channel, cancellation timing, the single-flight
+# job-slot mutex.
+tokio = { version = "1", features = ["full"] }
+# Phase 1b (errors/, design-02 §5.2 rule 4): the sole, explicitly-lint-flagged
+# escape hatch for UNKNOWN_INTERNAL_ERROR. Not used to avoid mapping specific
+# errors - see errors::unknown_internal_error's #[deprecated] shim.
+anyhow = "1"
+# Phase 1b (errors/, design-02 §5.2 rule 2): structured "full chain to local
+# log, keyed by technical_id" - no subscriber is installed by Phase 1b (that
+# is application-wiring, Phase 2/main.rs), so these calls are no-ops until
+# one is, but the call sites and fields are correct today.
+tracing = "0.1"
+# Phase 1b (filesystem/, design-02 §3.1): cross-platform file-identity
+# comparison (Windows volume serial + file index / Unix dev+ino) - the exact
+# mechanism design-02 names ("the same-file crate's Handle, or direct
+# windows-sys calls").
+same-file = "1.0.6"
+
+[target.'cfg(windows)'.dependencies]
+# Phase 1b: Job Objects for Windows process-tree control (§2.2, §2.5),
+# no-replace atomic rename via MoveFileExW (§3.4 - std::fs::rename always
+# replaces on Windows and cannot be used for the Fail/AddNumericSuffix
+# conflict policies), file identity/disk-space probes.
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+    "Win32_Security",
+    "Win32_Globalization",
+] }
+
+[target.'cfg(unix)'.dependencies]
+# Phase 1b: setsid (own process group) + process-group SIGTERM/SIGKILL for
+# cancellation (§2.2, §2.5). Unverified by compilation on this Windows-only
+# development machine - see the final report.
+libc = "0.2"
+
+[dev-dependencies]
+# Integration tests (design-02's Phase 1 exit criterion): scratch workspaces
+# and destination directories that must not collide with the real
+# filesystem or with each other across parallel test threads.
+tempfile = "3"
+

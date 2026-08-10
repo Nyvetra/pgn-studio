@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 2,
+  "engine": {
+    "name": "pgn-extract",
+    "repository": "https://github.com/kentdjb/pgn-extract",
+    "mirror": "https://github.com/Nyvetra/pgn-extract-mirror",
+    "defaultBranch": "main",
+    "commit": "e69e863b70f2fb8ed7916752db95e1c771daf4f0",
+    "gitTree": "f1fbf5ba594d5f5609f746749ea29d46769f55a6",
+    "committedAt": "2026-07-18T12:51:45+01:00",
+    "version": "v26-06",
+    "versionSource": "argsfile.c CURRENT_VERSION",
+    "license": "GPL-3.0-or-later",
+    "licenseEvidence": "source headers + copyright file: 'either version 3 of the License, or (at your option) any later version'; COPYING = GPLv3 text",
+    "sourceArchiveUrl": "https://github.com/kentdjb/pgn-extract/archive/e69e863b70f2fb8ed7916752db95e1c771daf4f0.tar.gz",
+    "sourceArchiveSha256": "8acaa7167ea3f7dc9e87210368f51efacf85f7ad8f8a2c94719a44490999c1cb",
+    "resources": {
+      "eco.pgn": {
+        "sizeBytes": 254748,
+        "sha256": "058ad9ffa6b393305520c5324f27598eae2ba8c3df966af790695a8ffcf66af3",
+        "note": "True upstream LF bytes, extracted with git cat-file -p <rev>:eco.pgn. Do NOT recompute from a git working tree - core.autocrlf will silently convert this to CRLF and change the hash/size (see decisions ledger D-008)."
+      },
+      "COPYING": {
+        "sizeBytes": 35147,
+        "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+        "note": "True upstream LF bytes, same CRLF caveat as eco.pgn above."
+      }
+    },
+    "patches": []
+  },
+  "regex": {
+    "windows": {
+      "name": "tre",
+      "repository": "https://github.com/laurikari/tre",
+      "mirror": "https://github.com/Nyvetra/tre-mirror",
+      "tag": "v0.9.0",
+      "commit": "d0e0c997336b3210f05b3e1daa7bb5cb9900d274",
+      "gitTree": "82e9f2d188d1077d9541639f4a96ee2fd41fa5f2",
+      "license": "BSD-2-Clause",
+      "licenseEvidence": "TRE LICENSE file: 2-clause BSD-style license, 'Copyright (c) 2001-2009 Ville Laurikari <vl@iki.fi>, All rights reserved', two-clause redistribution terms, no advertising clause",
+      "linkage": "static",
+      "buildMethod": "direct-cl-compile-of-lib",
+      "buildMethodNote": "win32/tre.vcxproj ships in the TRE tree but is unusable as-is: Win32(x86)-only (no x64 platform configured), builds a DynamicLibrary not a static lib, and its ClInclude list references lib/regex.h which does not exist at this commit (the real header is local_includes/regex.h). Fallback recipe (pre-approved, D-002) is documented in engine-src/patches/tre-msvc/README.md: compile lib/*.c directly with cl.exe using TRE's own win32/config.h + win32/tre-config.h (consumed unmodified, not copied into this repo), then stage local_includes/regex.h + local_includes/tre.h + win32/tre-config.h into a synthesized install-layout include/ directory (verbatim file copies, not edits) so pgn-extract's unmodified #include <regex.h> resolves via -I alone. Zero TRE source bytes and zero pgn-extract source bytes are modified.",
+      "patches": []
+    },
+    "macos": {
+      "name": "system-libc-regex",
+      "linkage": "libc",
+      "note": "No third-party regex on macOS - Apple's libSystem provides POSIX <regex.h>, matching upstream's own unix Makefile (LIBS=-lm only)."
+    }
+  },
+  "toolchains": {
+    "x86_64-pc-windows-msvc": {
+      "compiler": "MSVC cl.exe (VS 2022 Build Tools)",
+      "vswhereRequirement": "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+      "engineFlags": ["/std:c11", "/O2", "/MT", "/W3", "/D_CRT_SECURE_NO_WARNINGS", "/Brepro"],
+      "treFlags": ["/std:c11", "/O2", "/MT", "/W3", "/DHAVE_CONFIG_H", "/Brepro"],
+      "linkFlags": ["/Brepro"],
+      "manifest": "engine-src/manifest/pgn-extract.manifest",
+      "manifestPurpose": "Embeds activeCodePage=UTF-8 (link /MANIFEST:EMBED /MANIFESTINPUT:...) so the ANSI CRT (fopen/access/argv construction) correctly handles non-ASCII paths on Windows 10 1903+. Verified against fixtures/unicode-paths/ - see fixtures/golden/regex and scripts/verify-engine.ps1.",
+      "reproducibility": "/Brepro (cl.exe on engineFlags+treFlags, lib.exe+link.exe on linkFlags) makes the installed pgn-extract-x86_64-pc-windows-msvc.exe byte-for-byte identical across clean rebuilds of the same pinned commit, INCLUDING neutralizing argsfile.c's `__DATE__` use (help banner) to a fixed placeholder instead of the real compile date - see engine-src/README.md 'Reproducibility' for full evidence and how to re-verify."
+    },
+    "aarch64-apple-darwin": {
+      "compiler": "Apple clang (recorded at build time by scripts/build-pgn-extract.sh)",
+      "engineFlags": ["-std=c99", "-O3", "-D__DATE__=\"1\"", "-D__TIME__=\"1\"", "-Wno-builtin-macro-redefined"],
+      "linkFlags": ["-Wl,-no_uuid"],
+      "verified": false,
+      "note": "Written but UNVERIFIED - no Mac available to this build (decisions ledger D-006). The -D__DATE__/-D__TIME__/-Wno-builtin-macro-redefined and -Wl,-no_uuid flags mirror the Windows /Brepro reproducibility fix (engine-src/README.md 'Reproducibility') but are themselves UNVERIFIED on real Apple clang - treat their first real run as verification, not a formality (same standing caveat as the rest of this toolchain entry)."
+    },
+    "x86_64-apple-darwin": {
+      "compiler": "Apple clang (recorded at build time by scripts/build-pgn-extract.sh)",
+      "engineFlags": ["-std=c99", "-O3", "-D__DATE__=\"1\"", "-D__TIME__=\"1\"", "-Wno-builtin-macro-redefined"],
+      "linkFlags": ["-Wl,-no_uuid"],
+      "verified": false,
+      "note": "Written but UNVERIFIED - no Mac available to this build (decisions ledger D-006). The -D__DATE__/-D__TIME__/-Wno-builtin-macro-redefined and -Wl,-no_uuid flags mirror the Windows /Brepro reproducibility fix (engine-src/README.md 'Reproducibility') but are themselves UNVERIFIED on real Apple clang - treat their first real run as verification, not a formality (same standing caveat as the rest of this toolchain entry)."
+    }
+  },
+  "lastVerified": "2026-08-07"
+}

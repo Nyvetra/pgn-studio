@@ -1,0 +1,30 @@
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "2026.01.10"]
+[Round "1"]
+[White "Quiet, Quinn"]
+[Black "Rambling, Remy"]
+[Result "1-0"]
+
+1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 {This is a
+deliberately very long comment used to test that the application and the
+bundled pgn-extract sidecar can stream and store large annotation text
+without truncating it, without measurable slowdown, and without corrupting
+surrounding tokens. In the King's Indian Defence, Black voluntarily accepts
+a spatial disadvantage in the center in exchange for long-term dynamic
+piece play, typically preparing a kingside pawn storm with moves such as
+Nc6, Ne8 or Nd7, f5, and sometimes g5-g4, while White frequently expands on
+the queenside with c5, b4, and a possible Nb5 or Nd5 outpost, or alternatively
+closes the center with d5 and races on the opposite wing; the resulting
+positions are famously double-edged and have been adopted at world
+championship level by players ranging from Bobby Fischer and Garry
+Kasparov to more recent elite grandmasters, precisely because the mutual
+imbalances reward calculation and concrete preparation over purely
+positional understanding, and because a single tempo gained or lost in the
+race between the two attacks can decide the game long before either king
+is objectively unsafe on move six alone. Repeating a similar sentence
+several times helps make this comment long enough to be a meaningful
+stress fixture: the point is length and continuity, not literary merit,
+the point is length and continuity, not literary merit, the point is
+length and continuity, not literary merit, the point is length and
+continuity, not literary merit.} 7. O-O Nc6 8. d5 Ne7 1-0

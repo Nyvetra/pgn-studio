@@ -1,0 +1,25 @@
+# Normalize line endings to LF in the repository and on checkout,
+# regardless of a contributor's local core.autocrlf setting. This avoids
+# platform-dependent diff noise and, more importantly, avoids silently
+# rewriting bytes in files whose checksums are recorded elsewhere in this
+# repository (see the exceptions below and engine-src/README.md point 4
+# for a real instance of this going wrong during Phase 0 development).
+* text=auto eol=lf
+
+# Upstream-verified files: their exact bytes are hashed and recorded in
+# src-tauri/resources/pgn-extract/SOURCE.json, THIRD_PARTY_NOTICES.md, and
+# engine-src/upstream.lock. Disable line-ending conversion entirely so a
+# checkout can never drift from the recorded checksum.
+LICENSE -text
+src-tauri/resources/pgn-extract/COPYING -text
+src-tauri/resources/pgn-extract/eco.pgn -text
+
+# Test fixtures: several files under fixtures/ deliberately test exact
+# byte content (CRLF vs LF line endings, a UTF-8 BOM). Never let git
+# normalize line endings here in either direction - see fixtures/README.md.
+fixtures/** -text
+
+# Binary assets.
+*.png binary
+*.ico binary
+*.icns binary

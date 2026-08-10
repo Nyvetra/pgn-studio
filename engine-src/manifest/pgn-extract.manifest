@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  SPDX-License-Identifier: GPL-3.0-or-later
+
+  PGN Studio-authored Win32 application manifest for the pgn-extract
+  sidecar (architecture.md §10.2, Phase 0b Unicode-path requirement).
+  This file is our own, not upstream pgn-extract content, and is embedded
+  into the built binary by scripts/build-pgn-extract.ps1 via
+  `link.exe /MANIFEST:EMBED /MANIFESTINPUT:<this file>`.
+
+  Why this exists: pgn-extract opens files with the ANSI CRT functions
+  fopen()/access() (see hashing.c, lex.c). On Windows, "ANSI" means
+  "bytes interpreted using the process's active code page" (CP_ACP).
+  Historically CP_ACP is a legacy code page (e.g. Windows-1252) that
+  cannot represent most non-Latin scripts, so any path containing e.g.
+  Bengali characters gets mangled to '?' before it ever reaches
+  CreateFileW, and the open fails.
+
+  Windows 10 1903+ lets a process opt in to UTF-8 as its ANSI code page
+  via this manifest setting (see Microsoft's "Use UTF-8 code pages in
+  Windows apps" docs: ActiveCodePage / <ws2:activeCodePage>). With this
+  manifest embedded, GetACP() returns CP_UTF8 (65001) for the whole
+  process, so fopen()/access() (and the CRT's own construction of argv
+  from the OS's wide command line at startup) all correctly round-trip
+  UTF-8 byte sequences instead of mangling them.
+
+  Empirically verified (Phase 0b scratch probe) against
+  fixtures/unicode-paths/: WITHOUT this manifest, pgn-extract fails with
+  "Unable to find <mangled-path-with-????>" and exits 1. WITH this
+  manifest embedded, it correctly opens and processes the same file,
+  including a Bengali-script PGN comment inside it.
+
+  Do not remove the <trustInfo> block the linker auto-generates when
+  merging this fragment - only <application>/<windowsSettings> is ours;
+  requestedExecutionLevel="asInvoker" is link.exe's own default and is
+  fine for a non-privileged CLI tool.
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings xmlns:ws2="http://schemas.microsoft.com/SMI/2019/WindowsSettings">
+      <ws2:activeCodePage>UTF-8</ws2:activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>

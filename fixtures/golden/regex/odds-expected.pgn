@@ -1,0 +1,12 @@
+[Event "PGN Studio TRE Odds Fixture"]
+[Site "Fixture Lab"]
+[Date "2026.01.01"]
+[Round "1"]
+[White "Strong"]
+[Black "Weaker"]
+[Result "*"]
+[SetUp "1"]
+[FEN "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"]
+
+1. e4 *
+

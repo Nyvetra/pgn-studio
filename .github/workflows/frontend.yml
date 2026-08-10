@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Frontend CI: lint, test, and build the React/TypeScript/Vite app.
+#
+# Per architecture.md §21.1, the target CI matrix is Windows x64, macOS
+# Apple Silicon, and macOS Intel. Only the Windows job has actually been
+# run/verified so far (this project's development environment is Windows).
+# The macOS jobs are present and genuinely execute, but are marked
+# `unverified: true` (continue-on-error) until someone confirms them on
+# real macOS hardware/runners - do not assume they are green.
+name: Frontend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: frontend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test-build:
+    name: >-
+      ${{ matrix.os }}${{ matrix.unverified && ' (unverified - not yet run on real macOS)' || '' }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.unverified }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            unverified: false
+          - os: macos-14 # Apple Silicon, per architecture.md §21.1
+            unverified: true
+          - os: macos-13 # Intel, per architecture.md §21.1
+            unverified: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies (npm ci, honors package-lock.json)
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Test (Vitest + React Testing Library)
+        run: npm test
+
+      - name: Build (tsc --noEmit + vite build)
+        run: npm run build

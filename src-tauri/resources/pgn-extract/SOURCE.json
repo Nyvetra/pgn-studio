@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "pgn-extract",
+  "description": "Upstream identity record for the third-party pgn-extract files bundled in this directory. See THIRD_PARTY_NOTICES.md and engine-src/README.md for the full compliance narrative.",
+  "upstream": {
+    "repository": "https://github.com/kentdjb/pgn-extract",
+    "defaultBranch": "main",
+    "commit": "e69e863b70f2fb8ed7916752db95e1c771daf4f0",
+    "commitDate": "2026-07-18T12:51:45+01:00",
+    "commitSubject": "Version 26-06: Bug fix for long games with variations requiring positional matches.",
+    "version": "v26-06",
+    "versionSource": "CURRENT_VERSION constant in argsfile.c at the pinned commit",
+    "license": "GPL-3.0-or-later",
+    "licenseEvidence": "Source file headers (e.g. main.c) and the repository's 'copyright' file both state: 'either version 3 of the License, or (at your option) any later version.'",
+    "author": "David J. Barnes (d.j.barnes@kent.ac.uk)",
+    "officialSite": "https://www.cs.kent.ac.uk/people/staff/djb/pgn-extract/"
+  },
+  "sourceArchive": {
+    "url": "https://github.com/kentdjb/pgn-extract/archive/e69e863b70f2fb8ed7916752db95e1c771daf4f0.tar.gz",
+    "sha256": "8acaa7167ea3f7dc9e87210368f51efacf85f7ad8f8a2c94719a44490999c1cb",
+    "verifiedBy": "Downloaded twice independently on 2026-08-07 and confirmed byte-identical SHA-256 both times. See engine-src/upstream.lock and engine-src/README.md for the reproduction steps."
+  },
+  "bundledFilesChecksumMethod": "Extracted directly from the verified sourceArchive tarball (tar xzf, then sha256sum), not copied from a local `git clone` working directory. This matters: a local checkout's line endings can be silently rewritten by the cloning machine's git core.autocrlf setting, which would change the file's bytes/hash without changing its meaning. Extracting from the already checksum-verified archive avoids that entirely and keeps these hashes tied to the same verified artifact as sourceArchive.sha256.",
+  "bundledFiles": [
+    {
+      "path": "COPYING",
+      "description": "Full, unmodified GNU GPLv3 license text as distributed with pgn-extract at the pinned commit.",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "modified": false
+    },
+    {
+      "path": "eco.pgn",
+      "description": "ECO (Encyclopaedia of Chess Openings) classification database distributed with pgn-extract, used by the engine's -e / --ecofile classification option.",
+      "sha256": "058ad9ffa6b393305520c5324f27598eae2ba8c3df966af790695a8ffcf66af3",
+      "modified": false,
+      "provenanceNote": "eco.pgn carries its own in-file header comment (reproduced in THIRD_PARTY_NOTICES.md) crediting Ewart Shaw, Franz Hemmer 'and others' for the original compilation, and states that its author (David J. Barnes) was given permission for its inclusion with pgn-extract. Neither that header nor the upstream repository states an independent open-source license for eco.pgn itself - only permission to redistribute it with pgn-extract. This SOURCE.json and THIRD_PARTY_NOTICES.md report that fact plainly rather than asserting a license eco.pgn does not itself declare."
+    }
+  ],
+  "notBundledYet": {
+    "note": "No pgn-extract *binary* (sidecar) is bundled in Phase 0. Only the license text, the ECO data file, and this identity record are bundled so far. Building and bundling the actual per-platform sidecar executable, and recording its own build-provenance/checksum, is Phase 1 scope - see src-tauri/binaries/README.md."
+  }
+}
