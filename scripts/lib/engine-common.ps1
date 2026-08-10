@@ -37,7 +37,15 @@ function Assert-CommitShape {
 # installed by winget/choco moments ago (make, for the upstream
 # test-suite layer) may not be visible to an already-running shell; this
 # is a harmless no-op otherwise.
+#
+# Windows-only, and explicitly gated as such: there is no registry to
+# re-read on macOS/Linux, where .NET has no Machine/User environment
+# scope at all and returns $null for both. Ungated, the assignment below
+# would therefore set PATH to the literal string ";" and strip make, git
+# and cc off the PATH of every non-Windows caller - and
+# verify-engine.ps1's Layer 2 calls this on all three CI platforms.
 function Update-PathFromRegistry {
+    if (-not $IsWindows) { return }
     $machine = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
     $user = [System.Environment]::GetEnvironmentVariable("Path", "User")
     $env:PATH = "$machine;$user"
@@ -170,11 +178,45 @@ function Get-HostTriple {
     if ($Override) { return $Override }
     $rustc = Get-Command rustc -ErrorAction SilentlyContinue
     if ($rustc) {
-        $triple = (& rustc --print host-tuple 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -eq 0 -and $triple) {
-            return $triple.Trim()
+        # Deliberately NOT written as `& rustc ... | Select-Object -First 1`.
+        # `Select-Object -First` stops the upstream pipeline the moment it
+        # has its one object, and PowerShell then leaves $LASTEXITCODE
+        # completely *unassigned* - which, under the `Set-StrictMode
+        # -Version Latest` both callers set, makes reading it a TERMINATING
+        # error rather than a $null. That is invisible interactively (some
+        # earlier native command in the session already set the variable)
+        # and build-pgn-extract.ps1 never hit it either, because it runs
+        # cmd.exe via vcvarsall long before it reaches this function. But
+        # verify-engine.ps1 calls Get-HostTriple as the first thing it does
+        # in a fresh `pwsh -command` process, so on GitHub Actions it died
+        # with "The variable '$LASTEXITCODE' cannot be retrieved because it
+        # has not been set" before printing a single line of its own output
+        # - the reason the Engine and Bundle workflow had never once got
+        # past its verify step. Collect the output first, read the exit
+        # code from the completed invocation, then slice.
+        $rustcOutput = & rustc --print host-tuple 2>$null
+        $rustcExit = if (Test-Path Variable:LASTEXITCODE) { $LASTEXITCODE } else { $null }
+        $triple = @($rustcOutput) | Select-Object -First 1
+        if ($rustcExit -eq 0 -and $triple) {
+            return ([string]$triple).Trim()
         }
     }
-    Write-Warning "rustc not found (or failed); defaulting target triple to x86_64-pc-windows-msvc. Pass -Triple to override."
-    return "x86_64-pc-windows-msvc"
+    # Fallback only: every environment this is expected to run in (dev
+    # boxes, and all CI legs via dtolnay/rust-toolchain) has rustc on PATH.
+    # Platform-aware because verify-engine.ps1 runs this on macOS too, where
+    # guessing a Windows triple would produce a bogus ENGINE_MISSING for a
+    # binary that was built and installed perfectly well.
+    $fallback = if ($IsMacOS) {
+        if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) {
+            "aarch64-apple-darwin"
+        }
+        else {
+            "x86_64-apple-darwin"
+        }
+    }
+    else {
+        "x86_64-pc-windows-msvc"
+    }
+    Write-Warning "rustc not found (or failed); defaulting target triple to $fallback. Pass -Triple to override."
+    return $fallback
 }

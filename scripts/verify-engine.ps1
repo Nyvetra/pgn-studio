@@ -43,13 +43,18 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
-if (-not $CacheDir) { $CacheDir = Join-Path $RepoRoot "engine-src\.build" }
-$LockPath = Join-Path $RepoRoot "engine-src\upstream.lock"
-$BinariesDir = Join-Path $RepoRoot "src-tauri\binaries"
+# Segment-at-a-time Join-Path, not embedded "a\b" literals: a backslash is
+# an ordinary filename character on macOS, so "engine-src\upstream.lock"
+# there names one file called `engine-src\upstream.lock` rather than a path
+# - and this script is meant to run under pwsh on all three CI platforms
+# (see the $IsWindows note below).
+if (-not $CacheDir) { $CacheDir = Join-Path $RepoRoot "engine-src" ".build" }
+$LockPath = Join-Path $RepoRoot "engine-src" "upstream.lock"
+$BinariesDir = Join-Path $RepoRoot "src-tauri" "binaries"
 $SkipsPath = Join-Path $PSScriptRoot "verify-skips.json"
-$RegexFixturesDir = Join-Path $RepoRoot "fixtures\golden\regex"
+$RegexFixturesDir = Join-Path $RepoRoot "fixtures" "golden" "regex"
 
-. (Join-Path $PSScriptRoot "lib\engine-common.ps1")
+. (Join-Path $PSScriptRoot "lib" "engine-common.ps1")
 
 if (-not (Test-Path $LockPath)) { throw "Could not find $LockPath" }
 $lock = Get-Content -Raw -LiteralPath $LockPath | ConvertFrom-Json
@@ -189,7 +194,12 @@ else {
         if (-not $makeCmd) {
             throw "GNU make not found on PATH. Install it (e.g. 'winget install --id ezwinports.make -e' or 'choco install make -y') and retry, or pass -SkipUpstreamSuite."
         }
-        $makeVersionBanner = (& make --version | Select-Object -First 1)
+        # Collected then sliced, never `& make --version | Select-Object
+        # -First 1` - see the long note in Get-HostTriple
+        # (lib/engine-common.ps1) for why piping a native command straight
+        # into Select-Object -First can leave $LASTEXITCODE unset.
+        $makeVersionLines = & make --version
+        $makeVersionBanner = @($makeVersionLines) | Select-Object -First 1
         Write-Host "  make: $makeVersionBanner"
 
         # On Windows this `make` (ezwinports GNU Make) runs recipe lines

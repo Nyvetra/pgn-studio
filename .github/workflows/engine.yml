@@ -23,6 +23,17 @@
 # `unverified: true` (continue-on-error) and named accordingly; do not
 # read their presence here as "macOS has been verified."
 #
+# The Intel leg is `macos-15-intel`, NOT `macos-13`. GitHub retired the
+# macOS 13 runner image in December 2025, and a job requesting a retired
+# label is never scheduled at all - it sits `queued` forever, which in
+# turn keeps the whole workflow run "in progress" indefinitely and makes
+# even the *completed* jobs' logs unfetchable via `gh run view --log`.
+# That is exactly what happened to this workflow's first run
+# (31432037434). `macos-15-intel` is GitHub's own documented x86_64
+# replacement and is scheduled to remain available until August 2027; it
+# is the last Intel image Actions will offer, so treat any future Intel
+# coverage here as time-boxed rather than permanent.
+#
 # No release signing/notarization happens in this workflow. Neither a
 # Windows code-signing certificate nor an Apple Developer ID is available
 # in this project's environment - see docs/release-process.md for exactly
@@ -34,6 +45,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # This workflow is expensive and rarely-triggered, so being able to
+  # re-run it on demand (e.g. after a runner-image change, or to re-confirm
+  # the engine build against an updated MSVC toolset) without pushing a
+  # no-op commit is worth the two lines.
+  workflow_dispatch:
 
 concurrency:
   group: engine-${{ github.workflow }}-${{ github.ref }}
@@ -53,7 +69,7 @@ jobs:
             unverified: false
           - os: macos-14 # Apple Silicon, per architecture.md §21.1
             unverified: true
-          - os: macos-13 # Intel, per architecture.md §21.1
+          - os: macos-15-intel # Intel, per architecture.md §21.1 (was macos-13 - see header)
             unverified: true
     steps:
       - uses: actions/checkout@v4
@@ -86,6 +102,14 @@ jobs:
         shell: pwsh
         run: ./scripts/build-pgn-extract.ps1
 
+      # Invoked directly (not as `bash ./scripts/...`) on purpose: that only
+      # works if the file's git mode is 100755, so this step doubles as the
+      # check that the executable bit is actually committed. It was not, in
+      # the first run of this workflow - the macOS leg died in 24s with
+      # "Permission denied" before executing one line of the script, which
+      # is a checkout-mode bug and NOT the macOS toolchain being wrong. This
+      # repo is developed on Windows, where the bit is easy to lose again;
+      # restore it with `git update-index --chmod=+x scripts/build-pgn-extract.sh`.
       - name: Build the pinned pgn-extract sidecar (macOS)
         if: runner.os == 'macOS'
         run: ./scripts/build-pgn-extract.sh

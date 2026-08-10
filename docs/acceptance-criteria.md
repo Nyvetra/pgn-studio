@@ -244,9 +244,14 @@ from their Rust source of truth.
   `engine-src/patches/` documents that zero source patches exist for
   pgn-extract, and the one build-recipe deviation for TRE (not a source
   patch). The Windows build is independently confirmed byte-reproducible
-  (a clean rebuild with cache and binary wiped reproduced an identical
-  SHA-256) — the strongest available evidence that "exact source" claims
-  are actually true, not merely asserted.
+  on a fixed MSVC toolset (a clean rebuild with cache and binary wiped
+  reproduced an identical SHA-256) — the strongest available evidence
+  that "exact source" claims are actually true, not merely asserted.
+  Across *different* MSVC toolsets the binary differs, which is expected
+  and does not weaken the claim: `/Brepro` removes time, not compiler
+  version, as a build input, and nothing in the integrity chain compares
+  against an externally-pinned hash. See `engine-src/README.md`'s "What
+  `/Brepro` does not fix" for the measured evidence.
 
 - [~] **GPL and third-party notices are bundled.** — Partially verified.
   `LICENSE` (GPL-3.0-or-later) and `THIRD_PARTY_NOTICES.md` are complete
