@@ -71,15 +71,22 @@ pub struct AppContext {
     pub settings: Box<dyn SettingsStore>,
     pub history: Box<dyn HistoryStore>,
     pub live_job: Mutex<Option<LiveJobSnapshot>>,
+    /// Where [`crate::observability::init_logging`] writes structured logs
+    /// (architecture.md §22.1) - held here so the `clear_logs` command
+    /// (architecture.md §22.1: "Provide 'Clear Logs.'") knows where to look
+    /// without re-deriving the platform log directory itself.
+    pub log_dir: PathBuf,
 }
 
 impl AppContext {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         engine: Result<EngineBundle, PublicError>,
         jobs_root: PathBuf,
         eco_file: PathBuf,
         settings: Box<dyn SettingsStore>,
         history: Box<dyn HistoryStore>,
+        log_dir: PathBuf,
     ) -> Self {
         Self {
             engine,
@@ -89,6 +96,7 @@ impl AppContext {
             settings,
             history,
             live_job: Mutex::new(None),
+            log_dir,
         }
     }
 

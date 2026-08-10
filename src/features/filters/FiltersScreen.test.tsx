@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { WorkflowProvider } from "../../state/WorkflowContext";
 import { useWorkflow } from "../../state/useWorkflow";
 import { compileFilters } from "../../state/filterMapping";
+import { checkA11y } from "../../test/a11y";
 import { FiltersScreen } from "./FiltersScreen";
 
 function CompiledPreview() {
@@ -26,6 +27,11 @@ function readCompiled(): ReturnType<typeof compileFilters> {
 }
 
 describe("FiltersScreen", () => {
+  it("has no automated a11y violations (architecture.md §13.8)", async () => {
+    const { container } = renderScreen();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it("compiles player/white/black text as they are typed", async () => {
     const user = userEvent.setup();
     renderScreen();

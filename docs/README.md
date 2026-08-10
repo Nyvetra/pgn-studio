@@ -1,19 +1,15 @@
 # docs/
 
-Reserved for the project documentation set described in architecture.md §8:
+Project documentation, per the repository structure in architecture.md §8.
 
-| Planned file | Content | Lands in |
-|---|---|---|
-| `user-guide.md` | End-user walkthrough of the five-step workflow (Files -> Operations -> Filters -> Review -> Run & Results). | Phase 2+, once that workflow exists. |
-| `engine-capabilities.md` | Human-readable record of what the pinned `pgn-extract` build actually supports, generated from/kept in sync with `EngineCapabilities` (architecture.md §10.4). | Phase 1, once the capability self-test exists. |
-| `duplicate-semantics.md` | Explains architecture.md §10.7's duplicate-detection semantics ("keep first copy", input order as retention priority, why comments/variations aren't part of duplicate identity) for both contributors and curious users. | Phase 3 (Deduplication and audit). |
-| `release-process.md` | How a signed/notarized release is cut end to end (architecture.md §21). | Phase 6 (Persistence and release quality). |
-| `adr/` | Architecture Decision Records for choices made after `PGN-Studio-architecture.md` was written (architecture.md §26). | As needed. |
+| File | Content |
+|---|---|
+| [`user-guide.md`](./user-guide.md) | End-user walkthrough of the five-step workflow (Files → Operations → Filters → Review → Run & Results). |
+| [`engine-capabilities.md`](./engine-capabilities.md) | What the pinned `pgn-extract` build actually supports, including several verified surprises that corrected earlier design assumptions. |
+| [`duplicate-semantics.md`](./duplicate-semantics.md) | Architecture.md §10.7's duplicate-detection semantics ("keep first copy," input order as retention priority) and the annotated-duplicate warning's exact meaning and limits. |
+| [`release-process.md`](./release-process.md) | How a release is built and verified end to end, including an honest accounting of what cannot be verified from a Windows-only development machine. |
+| [`acceptance-criteria.md`](./acceptance-criteria.md) | The project's own item-by-item self-assessment against architecture.md §25's MVP acceptance criteria - verified / not verified / not achievable here, with evidence for each. |
+| `adr/` | Architecture Decision Records for choices made after `PGN-Studio-architecture.md` was written (architecture.md §26). Not yet populated. |
 
-None of these exist yet. Phase 0 intentionally does not stub them out with
-placeholder prose, because most of their content depends on Phase 1+
-behavior that has not been built (an "engine capabilities" doc with nothing
-to describe, or a "release process" doc for a release process that doesn't
-exist, would be misleading rather than useful). This README is the
-placeholder for the directory itself, per the repository structure in
-architecture.md §8.
+All content above reflects the real, tested application as of Phase 6 -
+none of it is aspirational or written ahead of the behavior it describes.

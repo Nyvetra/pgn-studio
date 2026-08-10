@@ -58,6 +58,7 @@ mod tests {
                     tmp.join("history.json"),
                 ),
             ),
+            tmp.join("logs"),
         )
     }
 

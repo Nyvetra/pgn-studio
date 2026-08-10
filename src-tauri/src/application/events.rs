@@ -194,6 +194,21 @@ impl<R: Runtime> JobEventSink for TauriJobEventSink<R> {
                 }
             }
         });
+        // architecture.md §22.1: every stage/state transition of a real job
+        // is logged from this one central point (rather than at each of
+        // `jobs::run`/`jobs::process`'s many `sink.stage(...)`/`sink.state(...)`
+        // call sites) so the log gets every transition automatically,
+        // including any a future change to those modules adds, with no risk
+        // of a call site forgetting to log. Tests use `NullEventSink`/a
+        // counting stub (see `jobs::events`/this module's own test module),
+        // never this real sink, so test output stays quiet regardless of
+        // whether a subscriber happens to be installed process-wide.
+        tracing::info!(
+            job_id = %self.job_id,
+            component = "jobs::run",
+            state = ?state,
+            "job state changed"
+        );
         self.emit(JobEvent::State {
             job_id: self.job_id,
             seq,
@@ -202,6 +217,13 @@ impl<R: Runtime> JobEventSink for TauriJobEventSink<R> {
     }
 
     fn stage(&self, seq: u64, stage: JobStage, message: &str) {
+        tracing::info!(
+            job_id = %self.job_id,
+            component = "jobs::run",
+            stage = ?stage,
+            message,
+            "job stage changed"
+        );
         self.emit(JobEvent::Stage {
             job_id: self.job_id,
             seq,
@@ -250,6 +272,14 @@ impl<R: Runtime> JobEventSink for TauriJobEventSink<R> {
     }
 
     fn completed(&self, seq: u64, result: &JobResult) {
+        tracing::info!(
+            job_id = %self.job_id,
+            component = "jobs::run",
+            status = ?result.status,
+            error_code = ?result.error.as_ref().map(|e| e.code()),
+            elapsed_ms = result.elapsed_ms,
+            "job completed"
+        );
         self.emit(JobEvent::Completed {
             job_id: self.job_id,
             seq,

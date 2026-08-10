@@ -21,6 +21,7 @@ pub mod dto;
 pub mod engine;
 pub mod inputs;
 pub mod jobs;
+pub mod logs;
 pub mod settings;
 
 use tauri_specta::{collect_commands, Builder};
@@ -66,6 +67,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             jobs::export_job_manifest,
             settings::get_settings,
             settings::update_settings,
+            logs::clear_logs,
         ])
         // `JobEvent` is not registered via `tauri_specta`'s own
         // `Event`/`collect_events!` machinery - see `application::events`'s

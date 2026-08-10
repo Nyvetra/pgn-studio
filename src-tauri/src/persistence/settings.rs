@@ -54,8 +54,18 @@ pub enum UpdateCheckPolicy {
 /// supports it being optional ("Input hashing can be optional for very
 /// large files because it requires a full additional read"). Flagged in
 /// this crate's Phase 2a report for the coordinator to confirm or correct.
+/// `deny_unknown_fields` is deliberately **absent** here (unlike every
+/// other DTO in this codebase - see `domain::job_spec`'s doc comment for why
+/// it is normally load-bearing): this is the one type in the crate that is
+/// also *migration input*, deserialized from a document this exact build
+/// may never have written (an older on-disk file missing a field a later
+/// build added, or - a downgrade scenario - a newer build's file carrying a
+/// field this build has never heard of). `#[serde(default)]` below is the
+/// other half of the same decision: a field *missing* from the document
+/// falls back to [`SettingsDto::default`]'s value for that field alone,
+/// never the whole document. See [`migrate`] for how this is used.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase", default)]
 pub struct SettingsDto {
     pub schema_version: u32,
     pub theme: Theme,
@@ -163,15 +173,39 @@ fn read_or_default(path: &Path) -> SettingsDto {
 }
 
 /// The migration hook (task ask: "versioned JSON... with schemaVersion and
-/// a migration hook"). V1 has exactly one recognized `schemaVersion` (`1`)
-/// and migrates nothing else - a future V2 extends the match arms here,
-/// translating older documents forward, rather than changing
-/// [`SettingsDto`]'s own shape or this function's signature.
+/// a migration hook").
+///
+/// V1 has exactly one real on-disk *shape*, so there is nothing version-
+/// specific to transform yet - but "nothing to transform" must not mean
+/// "nothing tolerated". Whatever `schemaVersion` says - absent entirely (a
+/// hypothetical pre-versioning "v0" file), `1` (current), or a number this
+/// build has never seen (a downgrade: some other build, past or future,
+/// wrote a shape this one does not fully recognize) - this attempts the
+/// same lenient parse. [`SettingsDto`]'s `#[serde(default)]` fills in any
+/// field that is missing from the document with that one field's default,
+/// so a legacy file that predates a later field (or a foreign/future file
+/// carrying fields this build does not understand, which are simply
+/// ignored - `SettingsDto` has no `deny_unknown_fields`) still recovers
+/// every field it shares with the current shape. Only a document that is
+/// not a JSON object at all, or that has a field present with an
+/// incompatible *type* (not merely absent), fails to parse - and even then
+/// the caller ([`read_or_default`]) falls back to
+/// [`SettingsDto::default`] rather than ever erroring or crashing.
+///
+/// A future version whose fields change *meaning*, not just presence,
+/// would extend this function with a real per-`schemaVersion` transform
+/// before the lenient parse; V1 has no such case.
+///
+/// The recovered value's `schema_version` is always normalized to
+/// [`SCHEMA_VERSION`] regardless of what the source document's own tag
+/// said - a value that reaches this line was just parsed against *this
+/// build's* shape, so it truly is that version now, and a later
+/// [`SettingsStore::update`] must not persist a stale or foreign version
+/// number forever.
 fn migrate(value: serde_json::Value) -> Option<SettingsDto> {
-    match value.get("schemaVersion").and_then(|v| v.as_u64()) {
-        Some(1) => serde_json::from_value(value).ok(),
-        _ => None,
-    }
+    let mut settings: SettingsDto = serde_json::from_value(value).ok()?;
+    settings.schema_version = SCHEMA_VERSION;
+    Some(settings)
 }
 
 /// Storage seam (task ask: "Keep the storage layer small and behind a trait
@@ -240,10 +274,123 @@ mod tests {
         assert_eq!(migrate(value), Some(SettingsDto::default()));
     }
 
+    /// Superseded behavior, kept as a named record of the change: before
+    /// Phase 6, an unrecognized `schemaVersion` made [`migrate`] discard the
+    /// **entire** document, even fields it perfectly well understood - the
+    /// exact "silently discards user data" failure mode Phase 6's migration
+    /// requirement rules out. `{"schemaVersion": 999}` alone (no other
+    /// fields) has nothing *else* to preserve, so it is still a legitimate
+    /// case to prove the "safely defaulted, never crashes" half of the
+    /// contract - it just no longer returns `None` to do it.
     #[test]
-    fn unrecognized_schema_version_falls_back_to_none() {
+    fn unrecognized_schema_version_is_migrated_leniently_not_discarded() {
         let value = serde_json::json!({"schemaVersion": 999});
-        assert_eq!(migrate(value), None);
+        let migrated = migrate(value).expect(
+            "an unrecognized version with no other fields must still migrate to defaults, \
+             not be rejected outright",
+        );
+        assert_eq!(migrated, SettingsDto::default());
+        assert_eq!(
+            migrated.schema_version, SCHEMA_VERSION,
+            "the recovered document must be re-tagged with this build's version, not the \
+             foreign 999 the file claimed"
+        );
+    }
+
+    /// The architecture.md §15.1 illustrative example config is reproduced
+    /// here verbatim - it does **not** include `hashInputs` (a Phase 2a
+    /// addition to `SettingsDto`, postdating that doc example). Before this
+    /// change, deserializing this exact document with
+    /// `deny_unknown_fields`+no `default` would fail outright (a missing
+    /// required field is a hard error), silently discarding `theme`,
+    /// `defaultConflictPolicy`, and every other field the file DID specify -
+    /// proving the gap was not hypothetical.
+    #[test]
+    fn architecture_doc_example_config_missing_a_later_field_is_fully_recovered() {
+        let value = serde_json::json!({
+            "schemaVersion": 1,
+            "theme": "system",
+            "defaultOutputDirectory": null,
+            "defaultConflictPolicy": "addNumericSuffix",
+            "rememberRecentFiles": true,
+            "maxRecentJobs": 50,
+            "showAdvancedCommand": false,
+            "updateChecks": "off"
+        });
+        let migrated = migrate(value).expect("the doc's own example must migrate cleanly");
+        assert_eq!(migrated.theme, Theme::System);
+        assert_eq!(migrated.max_recent_jobs, 50);
+        assert!(
+            !migrated.hash_inputs,
+            "the absent field must default, not fail the whole file"
+        );
+    }
+
+    /// A "v0" legacy file: no `schemaVersion` key at all (predates
+    /// versioning entirely). Must recover every field it does carry, not
+    /// just fall back to blanket defaults.
+    #[test]
+    fn legacy_file_with_no_schema_version_key_preserves_the_fields_it_has() {
+        let value = serde_json::json!({
+            "theme": "dark",
+            "maxRecentJobs": 12
+        });
+        let migrated = migrate(value).expect("a missing schemaVersion must not be fatal");
+        assert_eq!(migrated.theme, Theme::Dark);
+        assert_eq!(migrated.max_recent_jobs, 12);
+        assert_eq!(
+            migrated.schema_version, SCHEMA_VERSION,
+            "a v0 file must be tagged as this build's current version once migrated"
+        );
+        // Everything the v0 file did not carry falls back to this field's
+        // own default individually - not proof the whole document was
+        // discarded.
+        assert_eq!(
+            migrated.default_conflict_policy,
+            SettingsDto::default().default_conflict_policy
+        );
+    }
+
+    /// A file from an imagined *future* build (schemaVersion the current
+    /// build has never seen) that happens to carry a field this build does
+    /// not recognize. The unknown field must be ignored, not fatal - and
+    /// every field this build DOES share with the future shape must still
+    /// come through.
+    #[test]
+    fn unknown_future_schema_version_with_an_unrecognized_field_still_recovers_known_fields() {
+        let value = serde_json::json!({
+            "schemaVersion": 2,
+            "theme": "dark",
+            "showAdvancedCommand": true,
+            "aFieldThisBuildHasNeverHeardOf": {"nested": true}
+        });
+        let migrated = migrate(value).expect("an unknown extra field must not be fatal");
+        assert_eq!(migrated.theme, Theme::Dark);
+        assert!(migrated.show_advanced_command);
+        assert_eq!(migrated.schema_version, SCHEMA_VERSION);
+    }
+
+    /// The genuinely-unrecoverable case: a field IS present but its value
+    /// has an incompatible type (not merely absent). This is corruption,
+    /// not a legacy/version-evolution case, so falling all the way back to
+    /// defaults is correct - and the crucial behavior is what happens next:
+    /// no panic, no propagated error, just a safe default (verified via the
+    /// public [`read_or_default`] entry point, since that is what a real
+    /// caller observes).
+    #[test]
+    fn a_field_with_an_incompatible_type_falls_back_to_full_defaults_without_crashing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("settings.json");
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&serde_json::json!({
+                "schemaVersion": 1,
+                "theme": 12345
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(read_or_default(&path), SettingsDto::default());
     }
 
     #[test]

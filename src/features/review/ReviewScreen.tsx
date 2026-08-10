@@ -13,6 +13,7 @@ import { ARTIFACT_KIND_LABELS, formatBytes } from "../../state/formatters";
 import { Banner } from "../../components/Banner";
 import { StepNav } from "../../components/StepNav";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { useFocusOnMount } from "../../components/useFocusOnMount";
 import "../../components/workflow-screen.css";
 import "./ReviewScreen.css";
 import { OperationSummary } from "./OperationSummary";
@@ -34,6 +35,7 @@ export function ReviewScreen() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const preview = useCommandPreview(state);
   const canRun = selectCanRun(state);
+  const headingRef = useFocusOnMount<HTMLHeadingElement>();
 
   function startRun(justConfirmedReplace: boolean) {
     const spec = buildJobSpec(state);
@@ -62,7 +64,9 @@ export function ReviewScreen() {
 
   return (
     <section className="workflow-screen" aria-labelledby="review-heading">
-      <h2 id="review-heading">Review</h2>
+      <h2 id="review-heading" ref={headingRef} tabIndex={-1}>
+        Review
+      </h2>
       <p className="workflow-screen__intro">
         Check everything below before running. Nothing happens to your source files at any point —
         every output is a new file.

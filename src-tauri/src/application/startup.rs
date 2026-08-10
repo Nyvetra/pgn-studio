@@ -81,6 +81,7 @@ pub async fn initialize<R: Runtime>(app: &AppHandle<R>) -> AppContext {
     match crate::filesystem::workspace::sweep_interrupted_workspaces(&jobs_root) {
         Ok(report) if !report.interrupted_job_ids.is_empty() => {
             tracing::info!(
+                component = "application::startup",
                 interrupted = report.interrupted_job_ids.len(),
                 deleted = report.deleted_paths.len(),
                 cleanup_failures = report.cleanup_failures.len(),
@@ -104,11 +105,25 @@ pub async fn initialize<R: Runtime>(app: &AppHandle<R>) -> AppContext {
     let settings = JsonSettingsStore::load_or_default(config_dir.join("settings.json"));
     let history = JsonHistoryStore::load_or_default(data_dir.join("history").join("index.json"));
 
+    // architecture.md §22.1: resolved the same way every other per-app
+    // directory in this function is (a real platform path in release
+    // builds, a temp-dir fallback if the platform resolver ever fails) -
+    // `observability::init_logging` (called earlier, from `lib.rs::run`,
+    // before this function - see its own doc comment for why the ordering
+    // matters) already created it; this is only a second, cheap resolution
+    // of the same path so `AppContext`/the `clear_logs` command know where
+    // to look.
+    let log_dir = app
+        .path()
+        .app_log_dir()
+        .unwrap_or_else(|_| std::env::temp_dir().join("pgn-studio-logs"));
+
     AppContext::new(
         engine,
         jobs_root,
         eco_file,
         Box::new(settings),
         Box::new(history),
+        log_dir,
     )
 }

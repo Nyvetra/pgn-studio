@@ -7,6 +7,7 @@ import { WorkflowProvider } from "../../state/WorkflowContext";
 import { useWorkflow } from "../../state/useWorkflow";
 import { JobRunProvider } from "../execution/JobRunProvider";
 import type { ValidationReportDto, CommandPreviewDto, JobSpec } from "../../ipc/client";
+import { checkA11y } from "../../test/a11y";
 import { ReviewScreen } from "./ReviewScreen";
 
 const compileJobPreview = vi.fn();
@@ -116,6 +117,12 @@ beforeEach(() => {
 });
 
 describe("ReviewScreen", () => {
+  it("has no automated a11y violations, including with errors/warnings/advisories shown (architecture.md §13.8)", async () => {
+    const { container } = renderScreen(false);
+    await screen.findByRole("heading", { name: "Warnings" });
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it("keeps Run disabled while validation has not returned ready", async () => {
     renderScreen(false);
     await waitFor(() => expect(screen.getByRole("button", { name: "Run Job" })).toBeDisabled());

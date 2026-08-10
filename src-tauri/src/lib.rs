@@ -34,6 +34,7 @@ pub mod engine;
 pub mod errors;
 pub mod filesystem;
 pub mod jobs;
+pub mod observability;
 pub mod persistence;
 
 use tauri::Manager;
@@ -113,6 +114,25 @@ pub fn run() {
         .invoke_handler(specta_builder.invoke_handler())
         .setup(move |app| {
             let handle = app.handle().clone();
+            // architecture.md §22.1: installed first, before anything else
+            // in `setup` runs, so that `application::startup::initialize`'s
+            // own `tracing::info!` (the startup workspace-sweep summary) is
+            // actually captured rather than silently dropped by the
+            // process's default no-op subscriber - see
+            // `errors::log_technical_detail`'s doc comment for the same
+            // "no subscriber yet" caveat this closes. The returned
+            // `WorkerGuard` is handed to Tauri's own state management
+            // purely to keep it alive for the process's lifetime (dropping
+            // it would stop the background log writer); nothing ever reads
+            // it back out.
+            let log_dir = app
+                .path()
+                .app_log_dir()
+                .unwrap_or_else(|_| std::env::temp_dir().join("pgn-studio-logs"));
+            if let Some(guard) = observability::init_logging(&log_dir) {
+                app.manage(guard);
+            }
+
             // `application::startup::initialize` does real async I/O
             // (engine two-gate verify + self-test + Unicode probe, plus the
             // startup workspace sweep) - `setup` itself is a synchronous

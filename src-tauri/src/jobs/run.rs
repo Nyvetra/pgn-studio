@@ -24,8 +24,8 @@ use crate::errors;
 use crate::filesystem::{
     self,
     manifest::{
-        CriteriaFileRecord, DraftManifest, ErrorRecord, FinalManifest, FinalStatus, WarningRecord,
-        MANIFEST_SCHEMA_VERSION,
+        build_manifest_input_records, CriteriaFileRecord, DraftManifest, ErrorRecord,
+        FinalManifest, FinalStatus, WarningRecord, MANIFEST_SCHEMA_VERSION,
     },
     publish::{self, ArtifactToPublish},
     validate::{validate_job, ValidationLayout},
@@ -62,6 +62,18 @@ pub struct RunJobContext<'a> {
 /// rather than as an `Err`, matching design-02 §2.1's state table (only
 /// `Running -> Failed`/`Cancelled` are terminal-with-detail transitions;
 /// nothing transitions "back out of" Running).
+///
+/// `#[tracing::instrument]` (architecture.md §22.1): every `tracing::*!`
+/// call anywhere in this function's call graph - including deep inside
+/// `errors::log_technical_detail`, which has no `job_id` of its own to log -
+/// automatically gains a `job_id` field via this span, correctly carried
+/// across every `.await` point (the reason this uses the attribute macro
+/// rather than a manually `.entered()` guard, which is well known not to
+/// survive `.await` correctly). `ctx`/`state`/`sink` are skipped from the
+/// span's own fields (none of them are meaningfully `Debug`-printable) -
+/// `spec.id` alone is recorded, under the name `job_id` to match every
+/// other structured field in this crate that identifies a job.
+#[tracing::instrument(name = "job", skip(spec, ctx, state, sink), fields(job_id = %spec.id))]
 pub async fn run_job(
     spec: JobSpec,
     ctx: &RunJobContext<'_>,
@@ -90,6 +102,7 @@ pub async fn run_job(
                 Vec::new(),
                 Vec::new(),
                 started_at,
+                None,
                 engine_identity,
                 FinalStatus::Failed,
                 Vec::new(),
@@ -182,6 +195,7 @@ pub async fn run_job(
                 Vec::new(),
                 Vec::new(),
                 started_at,
+                None,
                 engine_identity,
                 FinalStatus::Failed,
                 Vec::new(),
@@ -255,6 +269,7 @@ pub async fn run_job(
                 argv_record,
                 criteria_records,
                 started_at,
+                None,
                 engine_identity,
                 FinalStatus::Failed,
                 Vec::new(),
@@ -291,6 +306,7 @@ pub async fn run_job(
                 argv_record,
                 criteria_records,
                 started_at,
+                None,
                 engine_identity,
                 FinalStatus::Cancelled,
                 Vec::new(),
@@ -329,6 +345,7 @@ pub async fn run_job(
                     argv_record,
                     criteria_records,
                     started_at,
+                    exit_code,
                     engine_identity,
                     FinalStatus::Failed,
                     Vec::new(),
@@ -378,6 +395,7 @@ pub async fn run_job(
                     argv_record,
                     criteria_records,
                     started_at,
+                    exit_code,
                     engine_identity,
                     FinalStatus::Failed,
                     Vec::new(),
@@ -417,6 +435,7 @@ pub async fn run_job(
                         argv_record,
                         criteria_records,
                         started_at,
+                        exit_code,
                         engine_identity,
                         FinalStatus::Succeeded,
                         published,
@@ -448,6 +467,7 @@ pub async fn run_job(
                         argv_record,
                         criteria_records,
                         started_at,
+                        exit_code,
                         engine_identity,
                         FinalStatus::Failed,
                         failure.published_before_failure,
@@ -622,6 +642,7 @@ fn warn_on_annotated_duplicates(published: &[OutputArtifact], warnings: &mut Vec
         Ok(_) => {}
         Err(e) => {
             tracing::warn!(
+                component = "jobs::run",
                 error = %e,
                 path = %audit.path.display(),
                 "could not scan the duplicates audit file for annotations; skipping the \
@@ -697,6 +718,7 @@ fn finalize(
     argv: Vec<String>,
     criteria_files: Vec<CriteriaFileRecord>,
     started_at: DateTime<Utc>,
+    exit_code: Option<i32>,
     engine_identity: EngineIdentity,
     status: FinalStatus,
     artifacts: Vec<OutputArtifact>,
@@ -718,7 +740,17 @@ fn finalize(
     if let Some(ws) = workspace {
         let manifest = FinalManifest {
             schema_version: MANIFEST_SCHEMA_VERSION,
+            // architecture.md §15.3: "PGN Studio version", "operating
+            // system and architecture" - computed here directly (not
+            // threaded as parameters) since they are static per process,
+            // exactly mirroring `commands::dto::build_app_info`'s own
+            // values without creating a `jobs` -> `commands` dependency
+            // (the wrong direction: `commands` already depends on `jobs`).
+            app_version: env!("CARGO_PKG_VERSION").to_string(),
+            os: std::env::consts::OS.to_string(),
+            arch: std::env::consts::ARCH.to_string(),
             job_id,
+            inputs: build_manifest_input_records(&spec.inputs),
             spec: spec.clone(),
             argv,
             criteria_files,
@@ -726,6 +758,7 @@ fn finalize(
             engine: engine_identity.clone(),
             started_at,
             finished_at,
+            exit_code,
             artifacts: artifacts.clone(),
             metrics,
             warnings: warnings.iter().map(WarningRecord::from).collect(),

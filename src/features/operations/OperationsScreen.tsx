@@ -7,6 +7,7 @@
 import { useWorkflow } from "../../state/useWorkflow";
 import { selectActivePreset } from "../../state/workflowReducer";
 import { StepNav } from "../../components/StepNav";
+import { useFocusOnMount } from "../../components/useFocusOnMount";
 import "../../components/workflow-screen.css";
 import "./OperationsScreen.css";
 import { PresetPicker } from "./PresetPicker";
@@ -19,10 +20,13 @@ import { ArtifactsSection } from "./ArtifactsSection";
 export function OperationsScreen() {
   const { state, dispatch } = useWorkflow();
   const activePreset = selectActivePreset(state);
+  const headingRef = useFocusOnMount<HTMLHeadingElement>();
 
   return (
     <section className="workflow-screen" aria-labelledby="operations-heading">
-      <h2 id="operations-heading">Operations</h2>
+      <h2 id="operations-heading" ref={headingRef} tabIndex={-1}>
+        Operations
+      </h2>
       <p className="workflow-screen__intro">
         Choose a preset to start from a sensible baseline, then adjust anything below — every option
         is a real, editable setting, not a hidden command.

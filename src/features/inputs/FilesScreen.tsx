@@ -10,6 +10,7 @@ import { selectFilesStepReady } from "../../state/workflowReducer";
 import { DUPLICATE_POLICY_LABELS } from "../../types/workflow";
 import { Banner } from "../../components/Banner";
 import { StepNav } from "../../components/StepNav";
+import { useFocusOnMount } from "../../components/useFocusOnMount";
 import "../../components/workflow-screen.css";
 import { DropZone } from "./DropZone";
 import { SourceList } from "./SourceList";
@@ -19,13 +20,16 @@ import { useInputInspectionEffect } from "./useInputInspection";
 export function FilesScreen() {
   const { state, dispatch } = useWorkflow();
   useInputInspectionEffect(state.inputs, dispatch);
+  const headingRef = useFocusOnMount<HTMLHeadingElement>();
 
   const deduplicationEnabled = state.operations.duplicates !== "none";
   const ready = selectFilesStepReady(state);
 
   return (
     <section className="workflow-screen" aria-labelledby="files-heading">
-      <h2 id="files-heading">Files</h2>
+      <h2 id="files-heading" ref={headingRef} tabIndex={-1}>
+        Files
+      </h2>
       <p className="workflow-screen__intro">
         Add the PGN files you want to process, put them in the order you want, and choose where the
         new files should be written. Your original files are never modified.

@@ -6,6 +6,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { WorkflowProvider } from "../../state/WorkflowContext";
 import { useWorkflow } from "../../state/useWorkflow";
 import type { EngineCapabilities } from "../../ipc/client";
+import { checkA11y } from "../../test/a11y";
 import { OperationsScreen } from "./OperationsScreen";
 
 const selectInputFiles = vi.fn();
@@ -55,6 +56,11 @@ beforeEach(() => {
 });
 
 describe("OperationsScreen", () => {
+  it("has no automated a11y violations (architecture.md §13.8)", async () => {
+    const { container } = renderScreen(fullCapabilities());
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it("applying a preset updates the visible controls", async () => {
     const user = userEvent.setup();
     renderScreen(fullCapabilities());

@@ -1,0 +1,150 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Engine build/verify + Tauri bundle CI (architecture.md §21.1 items 5-7:
+# "build pinned pgn-extract; verify engine checksums and self-tests; build
+# Tauri bundles"). Kept in its own workflow, separate from frontend.yml/
+# rust.yml, because it is materially more expensive (a real from-source
+# compile of the engine, then a full application bundle) and has a
+# meaningfully different failure mode (an engine regression here means the
+# *shipped binary* is wrong, not that a test assertion failed).
+#
+# This workflow only *calls* scripts/build-pgn-extract.{ps1,sh} and
+# scripts/verify-engine.ps1 - it never modifies them, and it never rebuilds
+# or re-pins the engine from any commit other than the one already recorded
+# in engine-src/upstream.lock.
+#
+# Per architecture.md §21.1, the target CI matrix is Windows x64, macOS
+# Apple Silicon, and macOS Intel. Only the Windows job has actually been
+# run/verified so far (this project's development environment is Windows).
+# The macOS legs are real, executable job definitions - reviewed for
+# correctness against Apple clang/Tauri documentation - but have never
+# actually been run, exactly like scripts/build-pgn-extract.sh's own
+# "UNTESTED FROM THIS MACHINE" header says. They are marked
+# `unverified: true` (continue-on-error) and named accordingly; do not
+# read their presence here as "macOS has been verified."
+#
+# No release signing/notarization happens in this workflow. Neither a
+# Windows code-signing certificate nor an Apple Developer ID is available
+# in this project's environment - see docs/release-process.md for exactly
+# what a real signed release still requires. The bundle this workflow
+# produces is genuine and installable, just unsigned.
+name: Engine and Bundle
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: engine-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-verify-bundle:
+    name: >-
+      ${{ matrix.os }}${{ matrix.unverified && ' (unverified - not yet run on real macOS)' || '' }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.unverified }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            unverified: false
+          - os: macos-14 # Apple Silicon, per architecture.md §21.1
+            unverified: true
+          - os: macos-13 # Intel, per architecture.md §21.1
+            unverified: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install frontend dependencies (npm ci, honors package-lock.json)
+        run: npm ci
+
+      # scripts/verify-engine.ps1's Layer 2 runs pgn-extract's own upstream
+      # test/Makefile, which needs GNU make - see scripts/README.md's "quick
+      # start". GitHub's windows-latest runner ships Chocolatey but not
+      # `make`; macOS runners ship `make` (part of Xcode Command Line
+      # Tools) already.
+      - name: Install GNU make (Windows only)
+        if: runner.os == 'Windows'
+        run: choco install make -y --no-progress
+
+      - name: Build the pinned pgn-extract sidecar (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/build-pgn-extract.ps1
+
+      - name: Build the pinned pgn-extract sidecar (macOS)
+        if: runner.os == 'macOS'
+        run: ./scripts/build-pgn-extract.sh
+
+      # No skip flags: architecture.md's own instruction is "CI should run
+      # with nothing skipped" (scripts/README.md, restated).
+      - name: Verify the built engine (identity + upstream suite + supplemental goldens)
+        shell: pwsh
+        run: ./scripts/verify-engine.ps1
+
+      - name: Check generated TypeScript bindings are up to date
+        shell: pwsh
+        working-directory: src-tauri
+        run: |
+          cargo run -p xtask -- export-bindings
+          git diff --exit-code -- ../src/ipc/generated-types.ts
+
+      # Unsigned on purpose - see this file's own header comment and
+      # docs/release-process.md. `tauri build`'s own `beforeBuildCommand`
+      # (tauri.conf.json) runs `npm run build` for us.
+      - name: Build the Tauri application bundle
+        run: npm run tauri build
+
+      - name: Upload the unsigned bundle for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgn-studio-${{ matrix.os }}-unsigned
+          path: |
+            src-tauri/target/release/bundle/**
+          if-no-files-found: warn
+          retention-days: 7
+
+      # --- Signing/notarization stubs (architecture.md §21.1 item 10,
+      # §21.2, §21.3) ---
+      # Deliberately inert: no Windows code-signing certificate and no
+      # Apple Developer ID are available in this project's environment
+      # (decisions ledger D-006; docs/release-process.md has the full
+      # accounting). These steps are real, would-work CI steps, gated on
+      # repository secrets that do not exist yet - each one is a no-op
+      # until a maintainer adds the corresponding secret, at which point it
+      # activates with no further workflow changes needed. This is
+      # intentionally NOT a comment-only stub: leaving a real, conditional
+      # step in place is what "clearly-labelled stub" means operationally,
+      # as opposed to a step that would need to be written from scratch
+      # later.
+      - name: Sign Windows installer (skipped - no WINDOWS_CERTIFICATE secret configured)
+        if: runner.os == 'Windows' && env.WINDOWS_CERTIFICATE != ''
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+        run: |
+          echo "A WINDOWS_CERTIFICATE secret was provided but no signing implementation exists yet."
+          echo "See docs/release-process.md 'What a real public release still requires' before implementing this."
+          exit 1
+
+      - name: Notarize macOS bundle (skipped - no APPLE_ID/APPLE_TEAM_ID/APPLE_APP_PASSWORD secrets configured)
+        if: runner.os == 'macOS' && env.APPLE_ID != ''
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+        run: |
+          echo "An APPLE_ID secret was provided but no notarization implementation exists yet."
+          echo "See docs/release-process.md 'What a real public release still requires' before implementing this."
+          exit 1

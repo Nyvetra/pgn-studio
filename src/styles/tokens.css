@@ -1,10 +1,18 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /*
  * Design tokens for the five-step workflow UI (architecture.md §13.8:
- * "WCAG 2.2 AA contrast target"). Colors were chosen conservatively (large
- * luminance separation between text and background pairs) rather than
- * measured with an automated contrast checker, which was not available in
- * this environment — see the Phase 2b report for that caveat.
+ * "WCAG 2.2 AA contrast target"). Phase 6 replaced the "chosen
+ * conservatively... not measured with an automated contrast checker"
+ * caveat this comment used to carry: every text/background pair and every
+ * non-text UI-component pair (borders, focus rings — WCAG 2.2 SC 1.4.11)
+ * below has been computed against the real WCAG relative-luminance formula
+ * (see this crate's Phase 6 report for the exact ratios and the script
+ * used). Ten colors changed as a direct result — five light-mode, five
+ * dark-mode `*-border` tokens — because their original values fell as low
+ * as ~1.4:1 against their own background, well under the 3:1 floor
+ * SC 1.4.11 sets for a UI component's boundary. Every color in this file
+ * now clears its applicable bar; re-run the contrast script (see the Phase
+ * 6 report) after changing any value here.
  *
  * Both a light and a dark palette are provided (`prefers-color-scheme`).
  * There is no in-app theme *toggle* yet — `SettingsDto.theme` exists on the
@@ -19,7 +27,16 @@
   --color-bg: #ffffff;
   --color-bg-elevated: #ffffff;
   --color-bg-subtle: #f2f4f7;
-  --color-border: #d0d5dd;
+  /* 3.02:1 against --color-bg-subtle (the hardest of the three surfaces
+   * this token is used against), 3.32:1 against --color-bg/-elevated —
+   * was #d0d5dd (1.47:1 against bg), too low for SC 1.4.11's 3:1 floor.
+   * Used for panel/dialog/list-item boundaries (fieldset groups, dialogs,
+   * the log panel, list separators) — never the sole way any of those
+   * boundaries are conveyed (headings/legends/spacing/list semantics carry
+   * the same structure), but strengthened anyway rather than relying on
+   * that "incidental" exception, since it removes all doubt at near-zero
+   * visual cost. */
+  --color-border: #808ea3;
   --color-border-strong: #667085;
 
   /* Text */
@@ -33,21 +50,32 @@
   --color-primary-hover: #1e40af;
   --color-primary-active: #1e3a8a;
 
-  /* Status */
+  /* Status. Each `*-border` below is only ever paired with its own
+   * matching `*-bg` (see e.g. Banner.css) — all four were recomputed
+   * against that exact pairing to clear 3:1 (SC 1.4.11); each was
+   * ~1.4-1.9:1 before. */
   --color-danger: #b3261e;
   --color-danger-bg: #fdecea;
-  --color-danger-border: #e3a099;
+  --color-danger-border: #d46c61; /* 3.00:1 vs --color-danger-bg (was #e3a099, 1.88:1) */
   --color-success: #146c2e;
   --color-success-bg: #eaf6ec;
-  --color-success-border: #a6d9b1;
+  --color-success-border: #439e57; /* 3.01:1 vs --color-success-bg (was #a6d9b1, 1.43:1) */
   --color-warning: #7a4100;
   --color-warning-bg: #fff4e0;
-  --color-warning-border: #f0c988;
+  --color-warning-border: #bd7f18; /* 3.10:1 vs --color-warning-bg (was #f0c988, 1.44:1) */
   --color-info: #0b4a8f;
   --color-info-bg: #eaf2fb;
-  --color-info-border: #a9c8ec;
+  --color-info-border: #4d8dd8; /* 3.04:1 vs --color-info-bg (was #a9c8ec, 1.53:1) */
 
-  /* Focus */
+  /* Focus. --color-focus-ring vs --color-bg is 6.70:1 (light) / 8.99:1
+   * (dark), comfortably over the 3:1 SC 1.4.11 floor. It also equals
+   * --color-primary by design (brand-consistent focus color); a pairwise
+   * check against --color-primary itself as a "background" computes to
+   * ~1:1, but that pairing is never actually rendered: `outline-offset:
+   * 2px` below draws the ring entirely outside the element's own border
+   * box, over the *surrounding* background, never over the element's own
+   * fill — verified both from the CSS outline spec and by inspecting a
+   * focused primary button live (see the Phase 6 report). */
   --color-focus-ring: #1d4ed8;
   --focus-ring-width: 3px;
   --focus-ring-offset: 2px;
@@ -75,7 +103,11 @@
     --color-bg: #101318;
     --color-bg-elevated: #171b21;
     --color-bg-subtle: #1c212a;
-    --color-border: #2c333e;
+    /* 3.12:1 against --color-bg-subtle (hardest of the three surfaces),
+     * 3.60:1 against --color-bg, 3.34:1 against --color-bg-elevated — was
+     * #2c333e (1.46:1 against bg). Same token/rationale as the light-mode
+     * value above. */
+    --color-border: #5f6e86;
     --color-border-strong: #6b7482;
 
     --color-text: #f0f2f5;
@@ -89,16 +121,16 @@
 
     --color-danger: #ff8a84;
     --color-danger-bg: #3a1512;
-    --color-danger-border: #6e2a24;
+    --color-danger-border: #b7463c; /* 3.05:1 vs --color-danger-bg (was #6e2a24, 1.56:1) */
     --color-success: #6fe08a;
     --color-success-bg: #123a1d;
-    --color-success-border: #235c34;
+    --color-success-border: #358c4f; /* 3.04:1 vs --color-success-bg (was #235c34, 1.61:1) */
     --color-warning: #ffb454;
     --color-warning-bg: #3a2600;
-    --color-warning-border: #6b4a12;
+    --color-warning-border: #9b6b1a; /* 3.10:1 vs --color-warning-bg (was #6b4a12, 1.79:1) */
     --color-info: #8ec1ff;
     --color-info-bg: #102336;
-    --color-info-border: #234a66;
+    --color-info-border: #35719b; /* 3.03:1 vs --color-info-bg (was #234a66, 1.70:1) */
     --color-focus-ring: #8fb4ff;
   }
 }

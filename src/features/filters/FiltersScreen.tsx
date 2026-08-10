@@ -10,6 +10,7 @@ import { validateFilterDraft } from "../../state/filterMapping";
 import { defaultFilterDraft } from "../../state/defaults";
 import { StepNav } from "../../components/StepNav";
 import { Button } from "../../components/Button";
+import { useFocusOnMount } from "../../components/useFocusOnMount";
 import "../../components/workflow-screen.css";
 import { NameAndResultFilters } from "./NameAndResultFilters";
 import { EloAndEcoFilters } from "./EloAndEcoFilters";
@@ -19,10 +20,13 @@ export function FiltersScreen() {
   const { state, dispatch } = useWorkflow();
   const problems = validateFilterDraft(state.filters);
   const hasProblems = Object.keys(problems).length > 0;
+  const headingRef = useFocusOnMount<HTMLHeadingElement>();
 
   return (
     <section className="workflow-screen" aria-labelledby="filters-heading">
-      <h2 id="filters-heading">Filters</h2>
+      <h2 id="filters-heading" ref={headingRef} tabIndex={-1}>
+        Filters
+      </h2>
       <p className="workflow-screen__intro">
         Every filter below is optional. Leave a field blank to not filter on it. A game that is
         missing the relevant tag entirely (for example, no Elo rating recorded) is excluded by any

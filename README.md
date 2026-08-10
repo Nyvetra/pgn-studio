@@ -15,31 +15,58 @@ document first - this README only orients you.
 
 ## Project status
 
-**Phase 0 - repository and compliance scaffold** (see architecture.md
-§24). There is no working end-user application yet: this stage sets up the
-Tauri 2 + React + TypeScript project structure, licensing/compliance
-files, the pinned upstream `pgn-extract` revision, test fixtures, and CI
-skeleton that later phases build on. The `get_app_info` command in
-`src-tauri/src/lib.rs` exists only to prove the frontend-to-Rust IPC
-boundary works end to end - it is not a feature.
+**Phase 6 of 6 - persistence, accessibility, documentation, and release
+quality** (see architecture.md §24). The Version 1 MVP workflow described
+below is implemented and tested end to end against the real, pinned engine
+sidecar - this is a working application, not a scaffold. What remains
+before a genuine public release is entirely in packaging/distribution, not
+the app itself: macOS builds are unverified (no Mac is available in this
+project's development environment) and neither Windows nor macOS release
+artifacts are code-signed yet (no certificates available). See
+[`docs/release-process.md`](./docs/release-process.md) and
+[`docs/acceptance-criteria.md`](./docs/acceptance-criteria.md) for the
+precise, honest breakdown of what is verified versus what is not.
 
-## What PGN Studio will do (Version 1 MVP)
+As of this phase: 300+ Rust tests and 230+ frontend tests passing,
+`clippy`/`fmt`/`eslint`/`tsc` all clean, and a five-step workflow UI backed
+by a real Rust job orchestrator and the real bundled `pgn-extract` sidecar
+- no mocked or simulated engine behavior anywhere in the shipped app.
 
-- Merge multiple PGN files into one new collection, in a user-chosen
-  order.
-- Validate game scores and separate broken games.
-- Detect duplicate move scores, write a unique-games output, and preserve
-  a duplicate-games audit file.
-- Optionally strip comments, variations, and NAGs.
-- Optionally add ECO/opening classification using the bundled `eco.pgn`.
-- Show the exact operation plan before running anything.
+## What PGN Studio does today (Version 1 MVP)
+
+- Add multiple PGN files and reorder them - file order is duplicate-
+  retention priority (see
+  [`docs/duplicate-semantics.md`](./docs/duplicate-semantics.md)).
+- Merge them into one new PGN, or run six other built-in presets (Clean
+  Collection, Minimal Mainline PGN, Lucena-Ready PGN, Validate Only, New
+  Games Against Master) - see
+  [`docs/user-guide.md`](./docs/user-guide.md).
+- Detect duplicate move scores, keep the first copy in file order, and
+  optionally write the diverted copies to an audit file.
+- Strip comments, variations, and NAGs independently of each other.
+- Add ECO/opening classification using the bundled `eco.pgn`.
+- Filter by player, result, Elo, date range, move-count range, checkmate-
+  only, starting position, ECO code, FEN pattern, and opening line - see
+  [`docs/engine-capabilities.md`](./docs/engine-capabilities.md) for the
+  verified, sometimes-surprising rules behind what each filter can and
+  cannot safely express.
+- Show the exact operation plan and generated engine argument list before
+  running anything - inspectable, never a hidden or shell-executed
+  command.
+- Run without freezing the interface, and cancel an active job cleanly.
+- Receive a manifest, a plain-language result summary, and (where
+  supported by the engine) honest metrics - an unmeasurable value is shown
+  as "Not available," never as a misleading zero.
 - **Never** modify or overwrite source files - every transformation writes
   new artifacts, and the app refuses to run if an output would alias an
   input.
-- Run entirely offline, with no accounts, telemetry, or network access.
+- Run entirely offline, with no accounts, telemetry, or network access -
+  verified, not just promised (architecture.md §22.3; see
+  `src-tauri/src/observability/`).
 
 See architecture.md §5 for the full release-scope breakdown (MVP through
-Version 3 "Game Studio").
+Version 3 "Game Studio") and [`docs/user-guide.md`](./docs/user-guide.md)
+for how to actually use each step.
 
 ## How it's built
 
@@ -64,6 +91,24 @@ npm install
 npm run tauri dev
 ```
 
+The bundled `pgn-extract` sidecar is not committed to this repository (see
+`engine-src/README.md` and `scripts/README.md`) - build it first with
+`pwsh ./scripts/build-pgn-extract.ps1` (Windows; see
+[`docs/release-process.md`](./docs/release-process.md) for the equivalent
+macOS status), or the app will start but report the engine as unavailable.
+
+### Running the tests
+
+```sh
+npm test                    # frontend: Vitest + React Testing Library + axe
+npm run lint                # ESLint
+npx tsc --noEmit            # TypeScript
+cd src-tauri
+cargo test                  # Rust: unit + integration, against the real sidecar
+cargo clippy --all-targets -- -D warnings
+cargo fmt --check
+```
+
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full development,
 testing, and lint workflow.
 
@@ -72,17 +117,23 @@ testing, and lint workflow.
 See architecture.md §8 for the authoritative repository structure and the
 rationale behind it. Highlights:
 
-- `src/` - React/TypeScript frontend.
-- `src-tauri/` - Rust backend and Tauri configuration. `src-tauri/src/`'s
-  subdirectories are currently near-empty placeholders (each has its own
-  `README.md`) reserved for Phase 1+ domain/engine/job logic.
+- `src/` - React/TypeScript frontend: the five-step workflow UI
+  (`src/features/`), shared accessible form components (`src/components/`),
+  and the typed Tauri IPC client (`src/ipc/`).
+- `src-tauri/` - Rust backend: domain model and pure command compiler
+  (`domain/`, `engine/`), job orchestration and process safety (`jobs/`),
+  filesystem safety (`filesystem/`), the public error taxonomy
+  (`errors/`), settings/history persistence (`persistence/`), structured
+  local logging (`observability/`), and the Tauri command/event surface
+  (`commands/`, `application/`).
 - `engine-src/` - pins the exact upstream `pgn-extract` revision PGN
   Studio builds against (`upstream.lock`) and documents how that pin is
   produced and verified.
 - `fixtures/` - small, synthetic PGN files used for engine-integration
   testing (see `fixtures/README.md`). No real game database is bundled.
-- `docs/` - reserved for user/engine/release documentation as it is
-  written (see `docs/README.md`).
+- `docs/` - user guide, engine capability notes, duplicate-detection
+  semantics, the release process, and the project's own honest acceptance-
+  criteria self-assessment (`docs/acceptance-criteria.md`).
 
 ## License and third-party notices
 

@@ -8,6 +8,7 @@ import { useJobRunContext } from "./useJobRunContext";
 import { RunScreen } from "./RunScreen";
 import { LiveAnnouncerProvider } from "../../components/LiveAnnouncer";
 import { WorkflowProvider } from "../../state/WorkflowContext";
+import { checkA11y } from "../../test/a11y";
 
 const startJob = vi.fn();
 const cancelJob = vi.fn();
@@ -143,6 +144,17 @@ beforeEach(() => {
 });
 
 describe("RunScreen", () => {
+  it("has no automated a11y violations once running (architecture.md §13.8)", async () => {
+    const user = userEvent.setup();
+    const { container } = renderHarness();
+    await user.click(screen.getByText("start-test-job"));
+    await waitFor(() => expect(screen.getByRole("progressbar")).toBeInTheDocument());
+    emit({ type: "stage", jobId: JOB_ID, seq: 1, stage: "processing", message: "Processing" });
+    emit({ type: "log", jobId: JOB_ID, seq: 2, level: "info", line: "Games: 42" });
+    await screen.findByText("Processing games");
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it("shows a waiting message before the job is accepted", () => {
     renderHarness();
     expect(screen.getByText(/Waiting for the job to start/)).toBeInTheDocument();

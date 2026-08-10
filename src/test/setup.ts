@@ -8,8 +8,17 @@
  * webview.
  */
 import "@testing-library/jest-dom/vitest";
-import { afterEach, vi } from "vitest";
+import { afterEach, expect, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { toHaveNoViolations } from "jest-axe";
+
+// Registers `toHaveNoViolations()` (architecture.md §13.8: "add automated
+// a11y assertions") on Vitest's own `expect` - `jest-axe` ships typed for
+// Jest's global `expect`, not Vitest's, but the runtime matcher object
+// `expect.extend` accepts is plain and framework-agnostic; the
+// corresponding TypeScript augmentation for Vitest's `Assertion` interface
+// lives in `src/test/vitest-matchers.d.ts`.
+expect.extend(toHaveNoViolations);
 
 // This project's vite.config.ts does not set `test.globals: true`, so
 // @testing-library/react's own auto-cleanup (which detects a *global*

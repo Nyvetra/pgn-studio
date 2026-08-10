@@ -13,7 +13,7 @@
  * record_history`, unconditional) - that history is bounded and local;
  * "Save Job" is an explicit, user-chosen, portable copy.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWorkflow } from "../../state/useWorkflow";
 import type { JobRunState } from "../../state/jobRunReducer";
 import { exportJobManifest } from "../../ipc/client";
@@ -21,6 +21,8 @@ import { formatBytes, formatCount, formatDuration } from "../../state/formatters
 import { Banner, type BannerTone } from "../../components/Banner";
 import { Button } from "../../components/Button";
 import { Metric, MetricList } from "../../components/Metric";
+import { useAnnounce } from "../../components/useAnnounce";
+import { useFocusOnMount } from "../../components/useFocusOnMount";
 import "../../components/workflow-screen.css";
 import "./ResultsScreen.css";
 import { ArtifactList } from "./ArtifactList";
@@ -52,6 +54,8 @@ export function ResultsScreen() {
   const jobRun = useJobRunContext();
   const [logVisible, setLogVisible] = useState(false);
   const [saveJob, setSaveJob] = useState<SaveJobState>({ status: "idle" });
+  const headingRef = useFocusOnMount<HTMLHeadingElement>();
+  const announce = useAnnounce();
 
   const { result } = jobRun.state;
   const artifacts = result?.artifacts ?? jobRun.state.artifacts;
@@ -65,6 +69,23 @@ export function ResultsScreen() {
   const error = result?.error ?? null;
   const warnings = result?.warnings ?? [];
   const statusInfo = resolveStatusInfo(jobRun.state.status);
+
+  // architecture.md §13.8: "screen-reader announcements for stage/status
+  // changes" — the one status change `RunScreen`'s own
+  // `useStageAnnouncements` cannot make (its component has already
+  // unmounted by the time a terminal status is reached; see
+  // `RunResultsStep`, which swaps `RunScreen` for this component the
+  // instant `selectIsTerminal` becomes true). This screen mounts exactly
+  // once per job, so a mount-only announcement through the same shared,
+  // already-in-the-DOM live region `useAnnounce` uses is the reliable
+  // equivalent — unlike relying on this screen's own fresh `role="status"`/
+  // `role="alert"` banner to be picked up, which is inconsistent across
+  // screen readers for a subtree that is inserted all at once rather than
+  // mutated in place.
+  useEffect(() => {
+    announce(`${statusInfo.label}. Elapsed time: ${formatDuration(elapsedMs)}.`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleRerun() {
     dispatch({ type: "REGENERATE_JOB_ID" });
@@ -95,7 +116,9 @@ export function ResultsScreen() {
 
   return (
     <section className="workflow-screen" aria-labelledby="results-heading">
-      <h2 id="results-heading">Results</h2>
+      <h2 id="results-heading" ref={headingRef} tabIndex={-1}>
+        Results
+      </h2>
 
       <Banner tone={statusInfo.tone} role={statusInfo.tone === "danger" ? "alert" : "status"} title={statusInfo.label}>
         <p>Elapsed time: {formatDuration(elapsedMs)}</p>

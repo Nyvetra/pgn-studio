@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { WorkflowProvider } from "../../state/WorkflowContext";
 import { useWorkflow } from "../../state/useWorkflow";
+import { checkA11y } from "../../test/a11y";
 import { FilesScreen } from "./FilesScreen";
 
 const selectInputFiles = vi.fn();
@@ -54,6 +55,11 @@ beforeEach(() => {
 });
 
 describe("FilesScreen", () => {
+  it("has no automated a11y violations (architecture.md §13.8)", async () => {
+    const { container } = renderFilesScreen();
+    expect(await checkA11y(container)).toHaveNoViolations();
+  });
+
   it("Next is disabled until there is at least one input, an output folder, and a base name", async () => {
     const user = userEvent.setup();
     renderFilesScreen();

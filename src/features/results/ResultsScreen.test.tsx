@@ -8,6 +8,8 @@ import { JobRunProvider } from "../execution/JobRunProvider";
 import { useJobRunContext } from "../execution/useJobRunContext";
 import { WorkflowProvider } from "../../state/WorkflowContext";
 import { useWorkflow } from "../../state/useWorkflow";
+import { LiveAnnouncerProvider } from "../../components/LiveAnnouncer";
+import { checkA11y } from "../../test/a11y";
 import { ResultsScreen } from "./ResultsScreen";
 import { NOT_AVAILABLE } from "../../state/formatters";
 
@@ -167,9 +169,11 @@ async function renderCompleted(result: JobResult = succeededResult()) {
   render(
     <WorkflowProvider>
       <JobRunProvider>
-        <AdvanceFarthestStepToRunResultsOnce />
-        <Harness result={result} />
-        <StepProbe />
+        <LiveAnnouncerProvider>
+          <AdvanceFarthestStepToRunResultsOnce />
+          <Harness result={result} />
+          <StepProbe />
+        </LiveAnnouncerProvider>
       </JobRunProvider>
     </WorkflowProvider>,
   );
@@ -206,6 +210,15 @@ beforeEach(() => {
 });
 
 describe("ResultsScreen", () => {
+  it("has no automated a11y violations (architecture.md §13.8)", async () => {
+    await renderCompleted();
+    // `renderCompleted` returns only the `userEvent` instance (most tests
+    // in this file only need that) - `document.body` is exclusively this
+    // test's rendered content at this point (the shared setup's `afterEach`
+    // cleanup guarantees no leftovers from an earlier test in this file).
+    expect(await checkA11y(document.body)).toHaveNoViolations();
+  });
+
   it("shows a success banner and the elapsed time from the terminal result", async () => {
     await renderCompleted();
     expect(screen.getByText("Job succeeded")).toBeInTheDocument();

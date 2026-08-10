@@ -29,7 +29,8 @@ use specta::Type;
 use uuid::Uuid;
 
 use crate::domain::{
-    EngineIdentity, ErrorCode, JobSpec, JobWarning, OutputArtifact, ProcessingMetrics, PublicError,
+    EngineIdentity, ErrorCode, InputFile, JobSpec, JobWarning, OutputArtifact, ProcessingMetrics,
+    PublicError,
 };
 
 pub const MANIFEST_SCHEMA_VERSION: u32 = 1;
@@ -112,6 +113,61 @@ impl From<&PublicError> for ErrorRecord {
     }
 }
 
+/// One input file's identity as recorded in the manifest (architecture.md
+/// §15.3: "ordered input paths and metadata; optional hashes... Input
+/// hashing can be optional for very large files... If disabled, record size
+/// and modification time and label identity as non-cryptographic").
+///
+/// `JobSpec.inputs` (embedded in this same manifest via `spec`) already
+/// carries the ordered *paths* - see `domain::job_spec::InputFile`'s own
+/// doc comment for why it deliberately omits size/hash (that richer,
+/// I/O-derived data belongs to the separate `inspect_inputs` display probe,
+/// not the pure command compiler). This record is the manifest's own,
+/// independent capture of that metadata at the moment the job actually ran,
+/// restated here (rather than cross-referenced by index) so the manifest
+/// alone - without re-reading `spec.inputs` - already answers "what exactly
+/// did each input look like for this run." `size_bytes`/`modified_at` are
+/// always attempted (best-effort `None` on a stat failure, e.g. the file
+/// was deleted between validation and finalization); no cryptographic hash
+/// is computed here - V1 does not wire the `hashInputs` setting into the
+/// manifest-writing path, so this is always the architecture's own
+/// documented non-cryptographic fallback, never a false claim of a hash
+/// that was not actually computed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManifestInputRecord {
+    pub path: PathBuf,
+    pub display_name: String,
+    pub priority: u32,
+    pub size_bytes: Option<u64>,
+    pub modified_at: Option<DateTime<Utc>>,
+}
+
+/// Builds the ordered [`ManifestInputRecord`] list for `spec.inputs`,
+/// preserving input order exactly (no sort - `spec.inputs`'s own order,
+/// same as the compiler's). A missing/unreadable file (e.g. deleted
+/// mid-job) yields `None` for both fields rather than failing the whole
+/// manifest - this is best-effort audit metadata, not a validation gate
+/// (validation already ran separately, before the engine was ever spawned).
+pub(crate) fn build_manifest_input_records(inputs: &[InputFile]) -> Vec<ManifestInputRecord> {
+    inputs
+        .iter()
+        .map(|input| {
+            let metadata = std::fs::metadata(&input.path).ok();
+            ManifestInputRecord {
+                path: input.path.clone(),
+                display_name: input.display_name.clone(),
+                priority: input.priority,
+                size_bytes: metadata.as_ref().map(|m| m.len()),
+                modified_at: metadata
+                    .as_ref()
+                    .and_then(|m| m.modified().ok())
+                    .map(DateTime::<Utc>::from),
+            }
+        })
+        .collect()
+}
+
 /// Written to `<ws>/manifest.draft.json` then atomically promoted to
 /// `<ws>/manifest.json` **last**, after every artifact in `artifacts` has
 /// already been published (design-02 §3.4 step 7).
@@ -125,14 +181,44 @@ impl From<&PublicError> for ErrorRecord {
 #[serde(rename_all = "camelCase")]
 pub struct FinalManifest {
     pub schema_version: u32,
+    /// PGN Studio's own version (architecture.md §15.3: "PGN Studio
+    /// version"), independent of `engine.version` - the two are never
+    /// conflated (architecture.md §21.4: "app and engine versions remain
+    /// separately visible").
+    pub app_version: String,
+    /// `std::env::consts::OS` (e.g. `"windows"`) - the same value
+    /// `commands::dto::AppInfoDto::os` reports, restated here so the
+    /// manifest is self-describing without cross-referencing a live app
+    /// instance.
+    pub os: String,
+    /// `std::env::consts::ARCH` (e.g. `"x86_64"`). Note this is the *host*
+    /// architecture the app itself ran on, which for a genuine release
+    /// build always matches `engine.target_triple`'s architecture (a single
+    /// per-platform sidecar is bundled) - kept as a separate field anyway
+    /// per architecture.md §15.3's own separate "operating system and
+    /// architecture" bullet, rather than asking a reader to parse it back
+    /// out of the engine's target triple.
+    pub arch: String,
     pub job_id: Uuid,
     pub spec: JobSpec,
+    /// Ordered input metadata (architecture.md §15.3): see
+    /// [`ManifestInputRecord`]'s own doc comment for what this does and
+    /// does not capture.
+    pub inputs: Vec<ManifestInputRecord>,
     pub argv: Vec<String>,
     pub criteria_files: Vec<CriteriaFileRecord>,
     pub status: FinalStatus,
     pub engine: EngineIdentity,
     pub started_at: DateTime<Utc>,
     pub finished_at: DateTime<Utc>,
+    /// The engine process's raw exit code (architecture.md §15.3: "exit
+    /// code"), independent of `status`/`error`. `None` when no engine
+    /// process ever ran to completion (a pre-spawn validation/compile
+    /// failure, a spawn failure, or a cancellation that terminated the
+    /// process rather than letting it exit normally) - never a false `0`
+    /// standing in for "unknown" (architecture.md §9.3's binding rule
+    /// against substituting a placeholder for an unmeasured value).
+    pub exit_code: Option<i32>,
     pub artifacts: Vec<OutputArtifact>,
     pub metrics: ProcessingMetrics,
     pub warnings: Vec<WarningRecord>,
@@ -291,7 +377,17 @@ mod tests {
         };
         FinalManifest {
             schema_version: MANIFEST_SCHEMA_VERSION,
+            app_version: "0.1.0".to_string(),
+            os: "windows".to_string(),
+            arch: "x86_64".to_string(),
             job_id: spec.id,
+            inputs: vec![ManifestInputRecord {
+                path: spec.inputs[0].path.clone(),
+                display_name: spec.inputs[0].display_name.clone(),
+                priority: spec.inputs[0].priority,
+                size_bytes: Some(10),
+                modified_at: None,
+            }],
             spec,
             argv: vec!["-s".to_string()],
             criteria_files: vec![],
@@ -303,6 +399,7 @@ mod tests {
             },
             started_at: Utc::now(),
             finished_at: Utc::now(),
+            exit_code: Some(0),
             artifacts: vec![OutputArtifact {
                 kind: ArtifactKind::UniqueGames,
                 path: PathBuf::from(r"C:\dest\out.pgn"),
@@ -366,6 +463,103 @@ mod tests {
         let bytes = serde_json::to_vec(&value).unwrap();
         let err = parse_and_revalidate_exported_manifest(&bytes).unwrap_err();
         assert_eq!(err.code(), ErrorCode::InvalidJobSpec);
+    }
+
+    /// architecture.md §15.3's manifest checklist, item by item: "PGN
+    /// Studio version", "operating system and architecture", and "exit
+    /// code" must all be present and independently readable, not folded
+    /// into free text elsewhere (e.g. an error message).
+    #[test]
+    fn manifest_carries_app_version_os_arch_and_exit_code() {
+        let manifest = sample_manifest();
+        assert!(!manifest.app_version.is_empty());
+        assert!(!manifest.os.is_empty());
+        assert!(!manifest.arch.is_empty());
+        assert_eq!(manifest.exit_code, Some(0));
+    }
+
+    /// These fields must survive a full serialize/deserialize round trip
+    /// (the same path "Save Job" -> reopen exercises), not merely exist on
+    /// the in-memory struct.
+    #[test]
+    fn app_version_os_arch_and_exit_code_survive_a_json_round_trip() {
+        let manifest = sample_manifest();
+        let bytes = serde_json::to_vec(&manifest).unwrap();
+        let parsed: FinalManifest = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(parsed.app_version, manifest.app_version);
+        assert_eq!(parsed.os, manifest.os);
+        assert_eq!(parsed.arch, manifest.arch);
+        assert_eq!(parsed.exit_code, manifest.exit_code);
+    }
+
+    /// A cancelled-before-exit or never-spawned job must record `None`,
+    /// never a placeholder `0` standing in for "the engine did not actually
+    /// report an exit code" (architecture.md §9.3's anti-placeholder rule,
+    /// applied here to `exit_code` rather than a `ProcessingMetrics` field).
+    #[test]
+    fn exit_code_is_none_when_no_process_ever_completed() {
+        let mut manifest = sample_manifest();
+        manifest.exit_code = None;
+        manifest.status = FinalStatus::Cancelled;
+        let bytes = serde_json::to_vec(&manifest).unwrap();
+        let parsed: FinalManifest = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(parsed.exit_code, None);
+    }
+
+    #[test]
+    fn build_manifest_input_records_preserves_order_and_reports_size_for_existing_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let a = tmp.path().join("a.pgn");
+        let b = tmp.path().join("b.pgn");
+        std::fs::write(&a, b"12345").unwrap();
+        std::fs::write(&b, b"1234567890").unwrap();
+        let inputs = vec![
+            InputFile {
+                path: a.clone(),
+                display_name: "a.pgn".to_string(),
+                priority: 0,
+            },
+            InputFile {
+                path: b.clone(),
+                display_name: "b.pgn".to_string(),
+                priority: 1,
+            },
+        ];
+        let records = build_manifest_input_records(&inputs);
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].path, a, "order must match spec.inputs exactly");
+        assert_eq!(records[0].size_bytes, Some(5));
+        assert_eq!(records[1].path, b);
+        assert_eq!(records[1].size_bytes, Some(10));
+        assert!(
+            records.iter().all(|r| r.modified_at.is_some()),
+            "an existing, stat-able file must report a modification time"
+        );
+    }
+
+    /// architecture.md §15.3's own permitted fallback: "If disabled, record
+    /// size and modification time and label identity as non-cryptographic."
+    /// A missing file (deleted between validation and finalization) must
+    /// degrade to `None`/`None` rather than panicking the whole manifest
+    /// write.
+    #[test]
+    fn build_manifest_input_records_is_best_effort_for_a_missing_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let missing = tmp.path().join("gone.pgn");
+        let inputs = vec![InputFile {
+            path: missing.clone(),
+            display_name: "gone.pgn".to_string(),
+            priority: 0,
+        }];
+        let records = build_manifest_input_records(&inputs);
+        assert_eq!(
+            records.len(),
+            1,
+            "a missing file is still recorded, just without stats"
+        );
+        assert_eq!(records[0].path, missing);
+        assert_eq!(records[0].size_bytes, None);
+        assert_eq!(records[0].modified_at, None);
     }
 
     #[test]

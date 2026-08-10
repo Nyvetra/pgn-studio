@@ -19,6 +19,7 @@ import { Button } from "../../components/Button";
 import { StepNav } from "../../components/StepNav";
 import { ProgressIndicator } from "../../components/ProgressIndicator";
 import { useAnnounce } from "../../components/useAnnounce";
+import { useFocusOnMount } from "../../components/useFocusOnMount";
 import "../../components/workflow-screen.css";
 import "./RunScreen.css";
 import { STAGE_LABELS } from "./stageLabels";
@@ -62,13 +63,16 @@ export function RunScreen() {
   const { dispatch } = useWorkflow();
   const jobRun = useJobRunContext();
   const now = useTicker();
+  const headingRef = useFocusOnMount<HTMLHeadingElement>();
   useStageAnnouncements(jobRun.state);
 
   if (jobRun.state.startError) {
     const error = jobRun.state.startError;
     return (
       <section className="workflow-screen" aria-labelledby="run-heading">
-        <h2 id="run-heading">Run</h2>
+        <h2 id="run-heading" ref={headingRef} tabIndex={-1}>
+          Run
+        </h2>
         <Banner tone="danger" role="alert" title={error.title}>
           <p>{error.message}</p>
           {error.remediation && <p>{error.remediation}</p>}
@@ -81,7 +85,9 @@ export function RunScreen() {
   if (jobRun.state.status === "idle") {
     return (
       <section className="workflow-screen" aria-labelledby="run-heading">
-        <h2 id="run-heading">Run</h2>
+        <h2 id="run-heading" ref={headingRef} tabIndex={-1}>
+          Run
+        </h2>
         <p role="status">Waiting for the job to start…</p>
       </section>
     );
@@ -95,7 +101,9 @@ export function RunScreen() {
 
   return (
     <section className="workflow-screen" aria-labelledby="run-heading">
-      <h2 id="run-heading">Run</h2>
+      <h2 id="run-heading" ref={headingRef} tabIndex={-1}>
+        Run
+      </h2>
       <Banner tone="info">
         Your original source files are never modified while this runs — every output is a new file.
       </Banner>

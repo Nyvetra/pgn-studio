@@ -57,6 +57,18 @@ anyhow = "1"
 # is application-wiring, Phase 2/main.rs), so these calls are no-ops until
 # one is, but the call sites and fields are correct today.
 tracing = "0.1"
+# Phase 6 (observability/, architecture.md §22.1): the subscriber that
+# actually renders every `tracing::*!` call site above (and every one
+# added since) to a bounded, rotated local log file - newline-delimited
+# JSON, so `timestamp`/`level`/every structured field (`job_id`, `stage`,
+# `component`, `code`, ...) are all machine-parseable without a second log
+# format to maintain.
+tracing-subscriber = { version = "0.3", features = ["json", "time", "fmt"] }
+# Phase 6: non-blocking file writer + time-based rotation. Bounded *count*/
+# *total size* retention (architecture.md §22.1) is this crate's own
+# `observability::retention` sweep on top - `tracing-appender` itself only
+# rotates, it never deletes old files.
+tracing-appender = "0.2"
 # Phase 1b (filesystem/, design-02 §3.1): cross-platform file-identity
 # comparison (Windows volume serial + file index / Unix dev+ino) - the exact
 # mechanism design-02 names ("the same-file crate's Handle, or direct

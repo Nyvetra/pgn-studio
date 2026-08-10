@@ -42,6 +42,7 @@ export const {
   exportJobManifest,
   getSettings,
   updateSettings,
+  clearLogs,
 } = commands;
 
 export type {
@@ -49,6 +50,7 @@ export type {
   ArtifactKind,
   BrokenOutput,
   CleanupOptions,
+  ClearLogsResultDto,
   CommandPreviewDto,
   ConflictPolicy,
   CriteriaFilePreviewDto,

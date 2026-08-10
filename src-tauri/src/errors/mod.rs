@@ -79,6 +79,7 @@ pub fn log_technical_detail(
         cursor = next.source();
     }
     tracing::error!(
+        component = "errors",
         technical_id = %technical_id,
         code = ?code,
         context,
@@ -781,6 +782,7 @@ pub fn annotated_duplicates_suppressed(
 pub fn unknown_internal_error(err: anyhow::Error) -> PublicError {
     let technical_id = new_technical_id();
     tracing::error!(
+        component = "errors",
         technical_id = %technical_id,
         code = ?ErrorCode::UnknownInternalError,
         chain = ?err,

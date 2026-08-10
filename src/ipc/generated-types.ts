@@ -34,6 +34,7 @@ export const commands = {
 	exportJobManifest: (jobId: string) => typedError<string | null, PublicError>(__TAURI_INVOKE("export_job_manifest", { jobId })),
 	getSettings: () => typedError<SettingsDto, PublicError>(__TAURI_INVOKE("get_settings")),
 	updateSettings: (patch: SettingsPatchDto_Deserialize) => typedError<SettingsDto, PublicError>(__TAURI_INVOKE("update_settings", { patch })),
+	clearLogs: () => typedError<ClearLogsResultDto, PublicError>(__TAURI_INVOKE("clear_logs")),
 };
 
 /* Types */
@@ -98,6 +99,16 @@ export type CleanupOptions = {
 	removeTags: string[],
 	rejectBadResults: boolean,
 	fixResultTags: boolean,
+};
+
+/**
+ *  `clear_logs` response: counts only, never file paths - a cleared log
+ *  directory has nothing left worth naming, and this keeps the shape
+ *  trivially stable regardless of how many files existed.
+ */
+export type ClearLogsResultDto = {
+	deletedCount: number,
+	failedCount: number,
 };
 
 /**
@@ -873,17 +884,27 @@ export type ScanInputDirectoryOptions = {
  *  supports it being optional ("Input hashing can be optional for very
  *  large files because it requires a full additional read"). Flagged in
  *  this crate's Phase 2a report for the coordinator to confirm or correct.
+ *  `deny_unknown_fields` is deliberately **absent** here (unlike every
+ *  other DTO in this codebase - see `domain::job_spec`'s doc comment for why
+ *  it is normally load-bearing): this is the one type in the crate that is
+ *  also *migration input*, deserialized from a document this exact build
+ *  may never have written (an older on-disk file missing a field a later
+ *  build added, or - a downgrade scenario - a newer build's file carrying a
+ *  field this build has never heard of). `#[serde(default)]` below is the
+ *  other half of the same decision: a field *missing* from the document
+ *  falls back to [`SettingsDto::default`]'s value for that field alone,
+ *  never the whole document. See [`migrate`] for how this is used.
  */
 export type SettingsDto = {
-	schemaVersion: number,
-	theme: Theme,
-	defaultOutputDirectory: string | null,
-	defaultConflictPolicy: ConflictPolicy,
-	rememberRecentFiles: boolean,
-	maxRecentJobs: number,
-	showAdvancedCommand: boolean,
-	updateChecks: UpdateCheckPolicy,
-	hashInputs: boolean,
+	schemaVersion?: number,
+	theme?: Theme,
+	defaultOutputDirectory?: string | null,
+	defaultConflictPolicy?: ConflictPolicy,
+	rememberRecentFiles?: boolean,
+	maxRecentJobs?: number,
+	showAdvancedCommand?: boolean,
+	updateChecks?: UpdateCheckPolicy,
+	hashInputs?: boolean,
 };
 
 /**
