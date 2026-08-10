@@ -69,6 +69,27 @@ Non-Latin file and folder names (Bengali), verified byte-correct on disk via
   containing `দ্বিতীয়-নমুনা.pgn` ("second sample") - a Bengali-named file
   inside a Bengali-named folder, to test nested Unicode path handling.
 
+## filters/
+
+Fixtures for Phase 5 (architecture.md §13.4, §24 Phase 5) filter/criteria-file
+integration testing, each purpose-built so a filter's positive, negative, and
+combination behavior can be asserted on an *exact* game count and be
+independently re-verified by running the real engine directly (every count
+in every filter integration test was produced this way, not hand-guessed):
+
+| File | Exercises |
+|---|---|
+| `players-results-dates.pgn` | Six games for player (either/White/Black), result, decisive-only, and date-range filters. Deliberately includes `Talbot, Toby` alongside `Tal, Mikhail` (the no-op-is-prefix-not-equality trap: a "Tal" filter also matches "Talbot"), and one game with Cyrillic player names (`Чайковский, Пётр` / `Толстой, Лев`) for Unicode round-trip-through-the-criteria-file testing. |
+| `date-edge-1999.pgn` | Three games dated `1999.01.01`, `1999.12.31`, and `2000.01.01` — pins the "`Date` ranges must render full dates" hazard (design-02 §1.5.1): a naive `Date <= "1999"` would wrongly exclude the `1999.12.31` game, since the engine defaults a missing month/day to `01/01`. |
+| `elo-tags.pgn` | Four games: both players rated, both mid-rated, **no Elo tags at all** (proves a game missing the filtered tag does not match), and **White-only** rated (proves the `Elo` pseudo-tag's "White first, then Black" semantics — a filter can be satisfied by one side alone even when the other side's tag is entirely absent). |
+| `eco-codes.pgn` | Five games with pre-set `ECO` tags (`B10`, `B90`, `A00`, `C50`, `B12`) spanning a "family" prefix collision (`B10`/`B12` both match prefix `"B1"`) — exercises prefix, `<>` (not-equal — DECISIONS-LEDGER.md D-010), and `=~` (regex) matching. ECO tags are set directly in the fixture rather than produced by `-e` classification, matching the same methodology D-010 itself used. |
+| `move-bounds.pgn` | Three games of exactly 3, 15, and 30 full moves (a deterministic, trivially-legal knight-shuffle move sequence — `Nf3`/`Ng1`/`Nf6`/`Ng8` repeated — chosen so the exact move count is correct by construction rather than by counting a "real" game's moves by hand). Reproduces DECISIONS-LEDGER.md D-007 V-3's `--maxmoves`/`--minmoves` order hazard: with a 10–15 filter, correct order keeps only the 15-move game, reversed order silently admits the 30-move game too. |
+| `checkmates.pgn` | Fool's mate (`Qh4#`, Black wins by checkmate) and Scholar's mate (`Qxf7#`, White wins by checkmate) alongside a decisive-but-not-checkmate game (a normal opening sequence with a `Result` tag but no `#` anywhere) — proves `--checkmate` is a positional check, not a `Result`-tag check. |
+| `escaping.pgn` | One game whose `Event` tag value contains a literal embedded double-quote and backslash (`Round "Robin" Stage C:\Games`, itself PGN-escaped in the file as `Round \"Robin\" Stage C:\\Games` per the PGN tag-value grammar), plus one plain game — proves a filter value containing `"`/`\` survives Rust's criteria-file escaping and round-trips into a correct match, and (combined with a second, unrelated criterion on `players-results-dates.pgn` in the integration test) that an adversarial value cannot corrupt/truncate a *later* line in the same criteria file (`taglines.c`'s silent-parse-termination hazard, design-02 §1.5). |
+| `tag-missing-entirely.pgn` | One game with an `ECO` tag, one with no `ECO` tag at all — pins a **correction to design-02 §1.5.1** (see the task report): design-02 claims a game missing a criteria tag matches "unless every criterion on that tag is `<>`"; fresh empirical testing disproves the exception — `ECO <> "B10"` matches the game whose real ECO (`C50`) differs, but does **not** match the game with no ECO tag at all. A missing tag never matches, with no `<>` carve-out. |
+
+Filters that need no dedicated fixture reuse existing ones: standard-start-vs-SetUp/FEN reuses `valid/setup-fen.pgn` (2 non-standard-start games) against `valid/single-game.pgn`/`valid/multi-game-results.pgn` (standard-start); "filters combined with cleanup and dedup in one job" reuses `duplicates/order-a.pgn`/`order-b.pgn` (a real duplicate pair) and `valid/long-comment.pgn` (a comment to strip) alongside `players-results-dates.pgn`.
+
 ## golden/
 
 Inputs reserved for architecture.md §20.2/§20.4's golden command/output

@@ -1,0 +1,29 @@
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "1999.01.01"]
+[Round "1"]
+[White "Edge, Early"]
+[Black "Case, Carl"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 1-0
+
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "1999.12.31"]
+[Round "1"]
+[White "Edge, Later"]
+[Black "Case, Carl"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 1-0
+
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "2000.01.01"]
+[Round "1"]
+[White "Outside, Otto"]
+[Black "Case, Carl"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 1-0

@@ -149,34 +149,78 @@ fn render_date_value(op: TagOp, value: &str) -> Result<String, CompileError> {
     })
 }
 
-/// ECO values are non-numeric, so five of the engine's six relational
-/// operators never match them (design-02 §1.5.1, `lists.c:744-775` "numeric
-/// gate") — a range like `ECO >= "B10"` would silently compile to a filter
-/// that matches nothing. This was empirically re-verified against the real
-/// engine binary (DECISIONS-LEDGER.md D-010) with fixture ECOs `B10`, `B90`,
-/// `A00`: `=`, `>`, `>=`, `<`, `<=` all matched nothing, but **`<>`
-/// (not-equal) worked** (`ECO <> "B10"` matched `B90`/`A00`) — `<>` is not a
-/// numeric-range comparison, just an inequality test, so it is exempt from
-/// the "numeric gate" the other five relational operators hit. Only a prefix
-/// match (no operator), a regex (`=~`), or `<>` are accepted; the other five
-/// are rejected rather than silently emitted.
-fn ensure_eco_op_allowed(op: TagOp) -> Result<(), CompileError> {
+/// The four pseudo/real tags whose values the engine compares **numerically**
+/// (`lists.c`'s Elo-family comparison path), where all six operators work
+/// correctly. Every other tag is compared as **text**.
+///
+/// **Task finding, generalizing DECISIONS-LEDGER.md D-010 (evidence below).**
+/// D-010 empirically verified that five of the engine's six relational
+/// operators (`<`, `<=`, `>`, `>=`, `=`) silently match **nothing** against
+/// `ECO`, and recorded this as an ECO-specific fact ("ECO operator support").
+/// Fresh empirical testing for this phase (real pinned sidecar, same
+/// methodology: purpose-built fixtures, exact-count assertions) proves this
+/// is **not** ECO-specific — it is a general property of every *non-numeric*
+/// tag:
+///
+/// ```text
+/// fixture: 6 games, incl. one with White = "Tal, Mikhail", Result "1-0" x3
+/// White = "Tal, Mikhail"        -> 0 games matched out of 6   (silently wrong)
+/// White > "M"                   -> 0 games matched out of 6   (silently wrong)
+/// Site  = "Fixture Lab"         -> 0 games matched out of 6   (ALL 6 games have this exact value!)
+/// Result = "1-0"                -> 0 games matched out of 6   (3 games actually have Result "1-0")
+/// Result "1-0"        (no op)   -> 3 games matched out of 6   CORRECT
+/// Result <> "1-0"               -> 3 games matched out of 6   CORRECT (0-1, 1/2-1/2, *)
+/// White <> "Tal, Mikhail"       -> 5 games matched out of 6   CORRECT
+/// WhiteElo = "2500"             -> matches correctly (numeric tag - unaffected)
+/// WhiteElo >= "2600"            -> matches correctly (numeric tag - unaffected)
+/// ```
+///
+/// This mattered in practice: before this fix, `src/state/filterMapping.ts`
+/// compiled every Result checkbox (White wins / Black wins / Draw / Other /
+/// Decisive-only) to `Result = "<value>"`, which — per the table above —
+/// silently produced a filter that matched **zero games, always**, for
+/// every job that used any Result filter. That call site is fixed alongside
+/// this generalized guard (now emits the no-op/prefix form instead, which is
+/// exactly equivalent for these four mutually non-prefixing literal values).
+fn tag_is_numeric(tag: TagName) -> bool {
+    matches!(
+        tag,
+        TagName::WhiteElo | TagName::BlackElo | TagName::Elo | TagName::EloDiff
+    )
+}
+
+/// For any non-numeric tag (see `tag_is_numeric`) other than `Date` — which
+/// has its own dedicated date-arithmetic comparison path, handled entirely
+/// by `render_date_value`, and is never routed through this function — only
+/// a prefix match (no operator), `<>` (not-equal), and `=~` (regex) are safe;
+/// `<`, `<=`, `>`, `>=`, `=` all silently compile to a filter that matches
+/// nothing (see `tag_is_numeric`'s doc comment for the empirical evidence).
+fn ensure_relational_op_safe_for_text_tag(tag: TagName, op: TagOp) -> Result<(), CompileError> {
+    if tag_is_numeric(tag) {
+        return Ok(());
+    }
     match op {
         TagOp::Prefix | TagOp::Regex | TagOp::Ne => Ok(()),
         _ => Err(CompileError::InvalidSpec {
-            field: "filters.tagRules[].op (ECO)".to_string(),
-            reason: "ECO values are non-numeric: five of the engine's relational operators \
-                     (<, <=, >, >=, =) never match them and would silently compile to a \
-                     filter that matches nothing. Use a prefix match (no operator, e.g. a \
-                     single code or family like \"B10\"/\"B1\"), a regex (=~), or <> \
-                     (not-equal, which is empirically verified to work) instead."
-                .to_string(),
+            field: format!("filters.tagRules[].op ({})", tag.as_engine_str()),
+            reason: format!(
+                "{} is compared as text, not a number: the engine's five relational/equality \
+                 operators (<, <=, >, >=, =) silently match nothing against it (empirically \
+                 verified against the real engine binary; DECISIONS-LEDGER.md D-010 recorded \
+                 the same fact for ECO specifically, but it is a general property of every \
+                 non-numeric tag - see `tag_is_numeric`'s doc comment). Use a prefix match (no \
+                 operator), <> (not-equal), or =~ (regex) instead.",
+                tag.as_engine_str()
+            ),
         }),
     }
 }
 
 const ALLOWED_RESULT_VALUES: [&str; 4] = ["1-0", "0-1", "1/2-1/2", "*"];
 
+/// Value-shape check only; operator safety is `ensure_relational_op_safe_for_text_tag`'s
+/// job and is checked separately (and first) by the caller. By the time this
+/// runs, `op` is already known to be `Prefix`, `Ne`, or `Regex`.
 fn ensure_result_value_allowed(op: TagOp, value: &str) -> Result<(), CompileError> {
     if op == TagOp::Regex || ALLOWED_RESULT_VALUES.contains(&value) {
         Ok(())
@@ -196,14 +240,18 @@ fn render_tag_rule_line(rule: &TagRule) -> Result<String, CompileError> {
     let rendered_value = match rule.tag {
         TagName::Date => render_date_value(rule.op, &rule.value)?,
         TagName::Eco => {
-            ensure_eco_op_allowed(rule.op)?;
+            ensure_relational_op_safe_for_text_tag(rule.tag, rule.op)?;
             rule.value.clone()
         }
         TagName::Result => {
+            ensure_relational_op_safe_for_text_tag(rule.tag, rule.op)?;
             ensure_result_value_allowed(rule.op, &rule.value)?;
             rule.value.clone()
         }
-        _ => rule.value.clone(),
+        _ => {
+            ensure_relational_op_safe_for_text_tag(rule.tag, rule.op)?;
+            rule.value.clone()
+        }
     };
     let escaped = escape_value(&rendered_value);
     let mut line = String::new();
@@ -558,35 +606,179 @@ mod tests {
         assert_eq!(rendered.content, "ECO \"B10\"\nECO \"B11\"\nECO \"B12\"\n");
     }
 
-    // --- Result value restriction ---
+    // --- Result value restriction, and the generalized text-tag operator guard ---
 
     #[test]
     fn result_rejects_nonsense_values() {
+        // Uses Prefix (the only operator that ever reaches the value check
+        // in practice) so this test isolates the *value*-legality check from
+        // the separate *operator*-legality check exercised below.
         let rules = vec![TagRule {
             tag: TagName::Result,
-            op: TagOp::Eq,
+            op: TagOp::Prefix,
             value: "banana".to_string(),
         }];
         let err = render_tags_file(&rules, None).unwrap_err();
         assert!(matches!(err, CompileError::InvalidSpec { .. }));
     }
 
+    /// **Correction, with evidence (Phase 5 task).** This test used to
+    /// assert that decisive results compile to `Result = "1-0"` /
+    /// `Result = "0-1"` (`TagOp::Eq`). Fresh empirical testing against the
+    /// real pinned engine proved that claim false: `Result = "1-0"` matches
+    /// **zero** games even when three of the six games in a purpose-built
+    /// fixture genuinely have `Result "1-0"` — see `tag_is_numeric`'s doc
+    /// comment for the exact commands/counts. `Result` hits the same
+    /// "numeric gate" as `ECO` (DECISIONS-LEDGER.md D-010); no test had
+    /// exercised it empirically before now because a pure-Rust unit test of
+    /// this renderer cannot catch this class of bug — the renderer
+    /// faithfully stringifies `TagOp::Eq` to `"="`, and the bug only exists
+    /// in the *engine's* interpretation of that string, which only a
+    /// real-engine integration test (see `phase5_filters_integration.rs`)
+    /// can observe. The old assertion is corrected here to the no-op
+    /// (prefix) form, which integration testing proved gives the correct
+    /// 3/6 and 4/6 match counts, and which is exactly equivalent to equality
+    /// for these four mutually non-prefixing literal values (`1-0`, `0-1`,
+    /// `1/2-1/2`, `*` — none is a textual prefix of another). This is also
+    /// what `src/state/filterMapping.ts` now emits (it used to emit `"eq"`,
+    /// which shipped with the same bug: every Result checkbox on the
+    /// Filters screen — White wins/Black wins/Draw/Other/Decisive-only —
+    /// compiled to a filter that silently matched zero games, always).
     #[test]
     fn result_decisive_is_two_ored_lines() {
         let rules = vec![
             TagRule {
                 tag: TagName::Result,
-                op: TagOp::Eq,
+                op: TagOp::Prefix,
                 value: "1-0".to_string(),
             },
             TagRule {
                 tag: TagName::Result,
-                op: TagOp::Eq,
+                op: TagOp::Prefix,
                 value: "0-1".to_string(),
             },
         ];
         let rendered = render_tags_file(&rules, None).unwrap().unwrap();
-        assert_eq!(rendered.content, "Result = \"1-0\"\nResult = \"0-1\"\n");
+        assert_eq!(rendered.content, "Result \"1-0\"\nResult \"0-1\"\n");
+    }
+
+    #[test]
+    fn result_numeric_relational_operators_are_rejected() {
+        // Generalizes `eco_numeric_relational_operators_are_rejected` to
+        // Result — empirically verified: `Result = "1-0"` matches nothing
+        // even for a fixture where it is textually true for 3/6 games (see
+        // `tag_is_numeric`'s doc comment).
+        for op in [TagOp::Lt, TagOp::Le, TagOp::Gt, TagOp::Ge, TagOp::Eq] {
+            let rules = vec![TagRule {
+                tag: TagName::Result,
+                op,
+                value: "1-0".to_string(),
+            }];
+            let err = render_tags_file(&rules, None).unwrap_err();
+            assert!(
+                matches!(err, CompileError::InvalidSpec { .. }),
+                "op {op:?} should be rejected for Result"
+            );
+        }
+    }
+
+    #[test]
+    fn result_not_equal_is_allowed() {
+        // Empirically verified: `Result <> "1-0"` correctly matched the 3
+        // non-"1-0" games out of 6 in the fixture.
+        let rules = vec![TagRule {
+            tag: TagName::Result,
+            op: TagOp::Ne,
+            value: "1-0".to_string(),
+        }];
+        let rendered = render_tags_file(&rules, None).unwrap().unwrap();
+        assert_eq!(rendered.content, "Result <> \"1-0\"\n");
+    }
+
+    // --- Generalized text-tag operator guard (beyond ECO/Result) ---
+
+    /// The task's core new finding: the "numeric gate" is not ECO-specific
+    /// (DECISIONS-LEDGER.md D-010's own framing) — it is a general property
+    /// of every non-numeric tag. Empirically reconfirmed directly against
+    /// the real engine for `White` and `Site` (see `tag_is_numeric`'s doc
+    /// comment for the exact commands/counts, including the striking
+    /// `Site = "Fixture Lab"` case: matches ZERO games even though every
+    /// single game in the fixture has that exact Site value). This test
+    /// pins the compiler-level guard for the tags most likely to be
+    /// (mis)used this way: `White`, `Black`, `Player`, `Event`.
+    #[test]
+    fn text_tags_reject_numeric_relational_operators() {
+        for tag in [
+            TagName::White,
+            TagName::Black,
+            TagName::Player,
+            TagName::Event,
+        ] {
+            for op in [TagOp::Lt, TagOp::Le, TagOp::Gt, TagOp::Ge, TagOp::Eq] {
+                let rules = vec![TagRule {
+                    tag,
+                    op,
+                    value: "Somebody".to_string(),
+                }];
+                let err = render_tags_file(&rules, None).unwrap_err();
+                assert!(
+                    matches!(err, CompileError::InvalidSpec { .. }),
+                    "tag {tag:?} op {op:?} should be rejected (text tag, numeric gate)"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn text_tags_allow_prefix_not_equal_and_regex() {
+        for tag in [TagName::White, TagName::Black, TagName::Player] {
+            for op in [TagOp::Prefix, TagOp::Ne, TagOp::Regex] {
+                let rules = vec![TagRule {
+                    tag,
+                    op,
+                    value: "Somebody".to_string(),
+                }];
+                assert!(
+                    render_tags_file(&rules, None).is_ok(),
+                    "tag {tag:?} op {op:?} should be allowed"
+                );
+            }
+        }
+    }
+
+    /// The boundary of the new guard: the four numeric (Elo-family) tags
+    /// must stay fully permissive of every operator, since they take the
+    /// engine's *numeric* comparison path — empirically confirmed working
+    /// (`WhiteElo = "2500"`, `WhiteElo >= "2600"` both matched correctly).
+    #[test]
+    fn elo_family_tags_permit_every_relational_operator() {
+        for tag in [
+            TagName::WhiteElo,
+            TagName::BlackElo,
+            TagName::Elo,
+            TagName::EloDiff,
+        ] {
+            for op in [
+                TagOp::Prefix,
+                TagOp::Lt,
+                TagOp::Le,
+                TagOp::Ne,
+                TagOp::Gt,
+                TagOp::Ge,
+                TagOp::Eq,
+                TagOp::Regex,
+            ] {
+                let rules = vec![TagRule {
+                    tag,
+                    op,
+                    value: "2000".to_string(),
+                }];
+                assert!(
+                    render_tags_file(&rules, None).is_ok(),
+                    "numeric tag {tag:?} op {op:?} must remain permitted"
+                );
+            }
+        }
     }
 
     // --- FEN pattern ---

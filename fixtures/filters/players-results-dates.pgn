@@ -1,0 +1,59 @@
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "1960.05.01"]
+[Round "1"]
+[White "Tal, Mikhail"]
+[Black "Botvinnik, Mikhail"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 1-0
+
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "1961.03.15"]
+[Round "1"]
+[White "Botvinnik, Mikhail"]
+[Black "Tal, Mikhail"]
+[Result "0-1"]
+
+1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7 5. e3 O-O 0-1
+
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "1965.07.07"]
+[Round "1"]
+[White "Talbot, Toby"]
+[Black "Botvinnik, Mikhail"]
+[Result "1/2-1/2"]
+
+1. c4 e5 2. Nc3 Nf6 3. Nf3 Nc6 4. g3 d5 5. cxd5 Nxd5 1/2-1/2
+
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "1972.09.01"]
+[Round "1"]
+[White "Fischer, Robert"]
+[Black "Spassky, Boris"]
+[Result "1-0"]
+
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 1-0
+
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "1972.09.02"]
+[Round "2"]
+[White "Fischer, Robert"]
+[Black "Spassky, Boris"]
+[Result "*"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Nf6 *
+
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "1975.11.20"]
+[Round "1"]
+[White "Чайковский, Пётр"]
+[Black "Толстой, Лев"]
+[Result "1-0"]
+
+1. Nf3 d5 2. g3 Nf6 3. Bg2 e6 4. O-O Be7 5. d3 O-O 1-0

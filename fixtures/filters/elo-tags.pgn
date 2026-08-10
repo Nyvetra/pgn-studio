@@ -1,0 +1,44 @@
+[Event "E1"]
+[Site "S"]
+[Date "2020.01.01"]
+[Round "1"]
+[White "Highrated, Hank"]
+[Black "Highrated, Helen"]
+[WhiteElo "2700"]
+[BlackElo "2650"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 1-0
+
+[Event "E2"]
+[Site "S"]
+[Date "2020.01.02"]
+[Round "1"]
+[White "Midrated, Mona"]
+[Black "Midrated, Milo"]
+[WhiteElo "2400"]
+[BlackElo "2380"]
+[Result "0-1"]
+
+1. d4 d5 2. c4 e6 0-1
+
+[Event "E3"]
+[Site "S"]
+[Date "2020.01.03"]
+[Round "1"]
+[White "Norating, Nora"]
+[Black "Norating, Ned"]
+[Result "1/2-1/2"]
+
+1. c4 c5 2. Nf3 Nf6 1/2-1/2
+
+[Event "E4"]
+[Site "S"]
+[Date "2020.01.04"]
+[Round "1"]
+[White "Partial, Pat"]
+[Black "Partial, Pam"]
+[WhiteElo "2700"]
+[Result "1-0"]
+
+1. d4 Nf6 2. c4 g6 1-0

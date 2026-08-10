@@ -43,11 +43,27 @@ describe("compileFilters", () => {
     expect(plan.tagRules).toEqual([{ tag: "White", op: "prefix", value: "Botvinnik" }]);
   });
 
-  it("decisive-only unions in exactly the two decisive Result values", () => {
+  it('decisive-only unions in exactly the two decisive Result values, using "prefix" not "eq"', () => {
+    // Correction, with evidence (Phase 5 task): this test used to assert
+    // `op === "eq"`. Empirical testing against the real engine proved that
+    // `Result = "1-0"` silently matches ZERO games, even when games with
+    // exactly that Result exist — Result hits the same non-numeric "gate"
+    // ECO does (D-010), which no unit test could catch since it is a fact
+    // about the *engine's* interpretation, not this renderer. "prefix" (no
+    // operator) is exactly equivalent to equality for these four literal
+    // values (none is a textual prefix of another) and is empirically
+    // verified to work. See `engine::criteria::tag_is_numeric`'s doc
+    // comment (Rust) and `phase5_filters_integration.rs` for the real-engine
+    // proof.
     const plan = compileFilters({ ...defaultFilterDraft(), decisiveOnly: true });
     const values = plan.tagRules.filter((r) => r.tag === "Result").map((r) => r.value).sort();
     expect(values).toEqual(["0-1", "1-0"]);
-    expect(plan.tagRules.every((r) => r.op === "eq")).toBe(true);
+    expect(plan.tagRules.every((r) => r.op === "prefix")).toBe(true);
+  });
+
+  it('compiles a single Result checkbox with "prefix", never "eq" (D-010-class engine gate)', () => {
+    const plan = compileFilters({ ...defaultFilterDraft(), resultDraw: true });
+    expect(plan.tagRules).toEqual([{ tag: "Result", op: "prefix", value: "1/2-1/2" }]);
   });
 
   it("decisive-only and an explicit draw checkbox union together without duplicating", () => {
@@ -126,6 +142,59 @@ describe("compileFilters", () => {
     const plan = compileFilters({ ...defaultFilterDraft(), checkmateOnly: true, setupPolicy: "setupOnly" });
     expect(plan.checkmateOnly).toBe(true);
     expect(plan.setupPolicy).toBe("setupOnly");
+  });
+
+  it("passes filter text through byte-for-byte, unescaped and uncomposed — React never touches criteria syntax", () => {
+    // Task binding rule: "React must never compose criteria syntax." This
+    // value is deliberately adversarial (embedded quotes, a backslash, a
+    // standalone quoted word) — if this module ever started escaping,
+    // quoting, or otherwise composing criteria-file text, this exact
+    // byte-for-byte equality would break. Escaping is exclusively
+    // `engine::criteria::escape_value`'s job (Rust), proven separately by
+    // `phase5_filters_integration.rs`'s `filter_value_with_quotes_and_backslashes_*`
+    // tests against the real engine.
+    const adversarial = String.raw`Ci\"ty "Open" C:\Games`;
+    const plan = compileFilters({ ...defaultFilterDraft(), player: adversarial });
+    expect(plan.tagRules).toEqual([{ tag: "Player", op: "prefix", value: adversarial }]);
+  });
+
+  it("never emits a relational/equality operator for a non-numeric tag (general form of the Result/ECO engine gate)", () => {
+    // Generalizes the ECO-specific "forbidden" check above (D-010) across
+    // every non-numeric tag this module can emit. Empirically verified
+    // against the real engine (Phase 5 task; see
+    // `engine::criteria::tag_is_numeric`'s doc comment in Rust): `=`, `>`,
+    // `>=`, `<`, `<=` silently match nothing for Player/White/Black/Result/
+    // ECO. Only `Date` and the Elo-family tags are exempt (they take the
+    // engine's numeric/date comparison path), and this module never emits
+    // Date with anything but "ge"/"le" anyway.
+    const draft = {
+      ...defaultFilterDraft(),
+      player: "Tal",
+      white: "Fischer",
+      black: "Karpov",
+      resultWhiteWin: true,
+      resultBlackWin: true,
+      resultDraw: true,
+      resultOther: true,
+      decisiveOnly: true,
+      ecoEntries: [
+        { id: "1", value: "B10", exclude: false },
+        { id: "2", value: "C00", exclude: true },
+      ],
+    };
+    const plan = compileFilters(draft);
+    const nonNumericTextTags = new Set(["Player", "White", "Black", "Result", "Eco"]);
+    const forbiddenOps = new Set(["eq", "gt", "ge", "lt", "le"]);
+    const offenders = plan.tagRules.filter(
+      (r) => nonNumericTextTags.has(r.tag) && forbiddenOps.has(r.op),
+    );
+    expect(offenders).toEqual([]);
+    // Sanity: the draft above genuinely produced rules for every one of
+    // those tags, so the assertion above isn't vacuously true.
+    const tagsSeen = new Set<string>(plan.tagRules.map((r) => r.tag));
+    for (const tag of nonNumericTextTags) {
+      expect(tagsSeen.has(tag)).toBe(true);
+    }
   });
 });
 

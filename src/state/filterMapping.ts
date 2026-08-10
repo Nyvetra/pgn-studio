@@ -54,7 +54,15 @@ export function compileFilters(draft: FilterDraft): FilterPlan {
   if (draft.resultDraw) results.add("1/2-1/2");
   if (draft.resultOther) results.add("*");
   for (const value of results) {
-    tagRules.push({ tag: "Result", op: "eq", value });
+    // "prefix" (no operator), never "eq": empirically verified against the
+    // real engine (Phase 5 task) that Result hits the same non-numeric
+    // "gate" as ECO (D-010) — `Result = "1-0"` silently matches ZERO games,
+    // even when games with that exact Result exist. Prefix matching is
+    // exactly equivalent to equality here since none of the four literal
+    // Result values (1-0, 0-1, 1/2-1/2, *) is a textual prefix of another.
+    // See `engine::criteria::tag_is_numeric`'s doc comment (Rust) for the
+    // full empirical evidence.
+    tagRules.push({ tag: "Result", op: "prefix", value });
   }
 
   if (draft.dateFromYear.trim()) {

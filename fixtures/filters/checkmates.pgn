@@ -1,0 +1,29 @@
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "2015.01.01"]
+[Round "1"]
+[White "Blunder, Bob"]
+[Black "Fastmate, Fiona"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "2015.01.02"]
+[Round "1"]
+[White "Scholar, Sally"]
+[Black "Victim, Victor"]
+[Result "1-0"]
+
+1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6 4. Qxf7# 1-0
+
+[Event "PGN Studio Fixture"]
+[Site "Fixture Lab"]
+[Date "2015.01.03"]
+[Round "1"]
+[White "Resign, Rita"]
+[Black "Winner, Wendy"]
+[Result "0-1"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 0-1
