@@ -40,7 +40,12 @@ jobs:
             unverified: false
           - os: macos-14 # Apple Silicon, per architecture.md §21.1
             unverified: true
-          - os: macos-13 # Intel, per architecture.md §21.1
+          # macos-15-intel, not macos-13: GitHub retired the macOS 13 image
+          # in December 2025 and a job asking for it is never scheduled at
+          # all - it sits `queued` until something cancels the run, which is
+          # why no run of this workflow had ever reached a conclusion. Full
+          # rationale in .github/workflows/engine.yml's header.
+          - os: macos-15-intel # Intel, per architecture.md §21.1
             unverified: true
     steps:
       - uses: actions/checkout@v4

@@ -183,6 +183,16 @@ shipped a given release, run `scripts/build-pgn-extract.ps1`, and get a
 byte-identical `pgn-extract-x86_64-pc-windows-msvc.exe` back - not merely
 "a working one."
 
+That last sentence carries one load-bearing qualifier that the rest of
+this section spells out: **on the same MSVC toolset**. `/Brepro` removes
+*time* as a build input, not *toolchain version* - and `upstream.lock`
+pins the engine sources, not the compiler that consumes them. See "What
+`/Brepro` does not fix" below for the measured evidence, and note that
+nothing in the integrity design depends on cross-toolset equality:
+`checksums.json` is written by the same build that produces the binary
+it describes, so Layer 1 compares a binary against its own build's hash,
+never against a hash pinned somewhere else.
+
 ### Why it wasn't reproducible before, and what fixed it
 
 MSVC's `link.exe` stamps the real wall-clock build time into the PE
@@ -250,9 +260,9 @@ Layer 1 of `verify-engine.ps1`) doesn't use `__DATE__` at all, and
 upstream's own `test/Makefile` target that exercises `-h`
 (`test-h`, the one target whose recipe line is intentionally
 `-`-prefixed so its exit status is ignored) has no oracle-diff against
-its output. TRE's sources use neither macro. Net result: this build is
-byte-reproducible **including** across different calendar days, without
-patching a single upstream source byte.
+its output. TRE's sources use neither macro. Net result: on a fixed
+toolset, this build is byte-reproducible **including** across different
+calendar days, without patching a single upstream source byte.
 
 ### What was checked and found to be a non-issue
 
@@ -308,6 +318,68 @@ build already had. This is a point-in-time confirmation (this pinned
 commit, these flags, this VS2022/MSVC 19.44 toolset) - re-run the steps
 above yourself any time you want to re-confirm it, e.g. after an
 upstream pin bump or a Visual Studio update.
+
+### What `/Brepro` does not fix: the MSVC toolset is itself an input
+
+The three-run proof above holds the compiler constant. It has since been
+measured across *different* compilers, and there the binaries differ -
+as they should:
+
+| toolset | sha256 | size |
+| --- | --- | --- |
+| MSVC 19.44 (VS2022 Build Tools) - the proof above, 3/3 runs | `03909cf9700d6948588ecf75826b0146c7dc7012d521d62c92f7c2c843a5da52` | 426496 |
+| MSVC 19.51.36252 (VS 18, GitHub Actions `windows-latest`, run 31432037434) | `afb4d97a5ccc82c466814c1f433341b116d58b623732ecc253eb8af0b6e05f4b` | 427520 |
+| a third machine (toolset version not recorded at the time) | `5395d991...` | 427008 |
+
+Three different toolsets, three different binaries, three different
+sizes. This is expected and is **not** a `/Brepro` failure: `/Brepro`
+neutralizes wall-clock timestamps and the `__DATE__`/`__TIME__`/
+`__TIMESTAMP__` macros, and it does exactly that. It cannot make two
+different code generators emit the same code. In reproducible-builds
+terms the toolchain is part of the input set, and `upstream.lock` pins
+the *engine* inputs (`engine.commit`, `regex.windows.commit`, the flag
+lists) - it does not pin `cl.exe`/`link.exe`, only the
+`vswhereRequirement` component ID needed to *find* some MSVC.
+
+What this does and does not cost:
+
+- **Neither gate of the integrity chain is affected.** Both compare a
+  binary against a hash recorded by *the same build that produced it*, so
+  neither has an expected value pinned in git or in this document:
+  - *Gate 1 (`verify-engine.ps1` Layer 1)* reads
+    `src-tauri/binaries/checksums.json`, which `build-pgn-extract.ps1`
+    writes at the end of its own run.
+  - *Gate 2 (Rust startup self-test)* compares the sidecar against
+    `EngineIdentity.sha256`, which `src-tauri/src/engine/capability.rs`
+    pulls from `build-info-<triple>.json` via `include_str!` at Rust
+    *compile* time. Both files are gitignored build output.
+
+  The real constraint this creates is an ordering one, not a
+  reproducibility one: the engine must be built before `cargo`/`tauri
+  build` compiles the Rust, on the same machine or CI run, or the crate
+  either fails to compile (no `build-info-*.json` to embed) or embeds a
+  hash belonging to a different build and fails at startup with
+  `ENGINE_TAMPERED`. That is why every workflow that compiles the Rust
+  crate has to build the sidecar first.
+
+  `build-info-<triple>.json` also records the exact `compiler` banner,
+  which is how the CI row in the table above was identified.
+- **The GPL corresponding-source story needs the qualifier.** A rebuilder
+  gets a byte-identical binary only if they use the same MSVC toolset
+  version; on a different one they get an equivalent, working binary with
+  a different hash. That is the normal state of affairs for
+  non-toolchain-pinned C projects, but it should be stated rather than
+  implied.
+- **Do not treat a hash difference across machines as tampering.** Compare
+  `build-info-<triple>.json`'s `compiler` field first; if the toolsets
+  differ, differing hashes are the expected result, and the meaningful
+  comparison is `verify-engine.ps1`'s Layers 2 and 3 (behaviour), not
+  Layer 1 (identity of a specific build).
+
+Pinning the toolset exactly (a fixed VS build-tools version in CI, or a
+container image) is the only way to promote the claim to a
+cross-machine one. That has not been done here, and is not required by
+anything the project currently asserts.
 
 ### macOS mirror (unverified)
 
