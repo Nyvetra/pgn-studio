@@ -125,6 +125,19 @@ export function DuplicateSection({
           disabled={duplicates === "none" || !loaded || !capabilities?.externalDuplicateTable}
           onCheckedChange={(useExternalDuplicateTable) => onRuntimeChange({ useExternalDuplicateTable })}
         />
+        {/* architecture.md §19.2: "Warn about temporary-disk requirements
+            before enabling external duplicate storage on very large
+            collections." Shown whenever the control is relevant to the
+            current duplicate policy, not only once checked, so the warning
+            is visible before the user opts in. */}
+        {duplicates !== "none" && (
+          <p className="workflow-screen__section-help">
+            This writes a temporary duplicate-lookup file to disk, inside this job&apos;s own
+            private working folder, instead of holding it in memory. Make sure the destination
+            drive has enough free space before turning this on for a very large collection — the
+            file is removed automatically when the job finishes.
+          </p>
+        )}
         {duplicates !== "none" && (!loaded || !capabilities?.externalDuplicateTable) && (
           <p className="workflow-screen__section-help">
             {capabilityDisabledReason(loaded, Boolean(capabilities?.externalDuplicateTable))}

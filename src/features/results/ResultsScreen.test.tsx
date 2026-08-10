@@ -235,6 +235,25 @@ describe("ResultsScreen", () => {
     expect(screen.getByText("Check the log for details.")).toBeInTheDocument();
   });
 
+  it("surfaces a job warning (e.g. the Phase 3 annotated-duplicate advisory) as its own banner", async () => {
+    await renderCompleted(
+      succeededResult({
+        warnings: [
+          {
+            code: "ANNOTATED_DUPLICATES_SUPPRESSED",
+            message:
+              '1 suppressed duplicate game in the duplicates audit file contains a comment, ' +
+              'NAG, or variation that the kept copy may not have.',
+          },
+        ],
+      }),
+    );
+    expect(screen.getByText("Warnings")).toBeInTheDocument();
+    expect(
+      screen.getByText(/suppressed duplicate game in the duplicates audit file/),
+    ).toBeInTheDocument();
+  });
+
   it('renders unknown metrics as "Not available", never 0 (§9.3, §13.7, §25 binding rule)', async () => {
     await renderCompleted(
       succeededResult({

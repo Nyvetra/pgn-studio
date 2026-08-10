@@ -44,6 +44,8 @@ headers, comments, or variations):
 | `annotated-vs-plain.pgn` | Identical moves and headers, but only the second copy has a comment and a NAG - proves annotations are not part of duplicate identity, and that the annotated copy's extra information would be lost if the plain copy were kept without an audit trail. |
 | `same-players-different-games.pgn` | Same two players across two rounds of a fictional match, but genuinely different openings/moves/results - a **negative** case: must *not* be flagged as a duplicate despite matching headers. |
 | `truncated-vs-complete.pgn` | A complete game and a second game sharing its exact opening prefix but ending early with `*` - a **negative** case: a truncated score must not be treated as identical to a complete one that happens to share an opening. |
+| `order-a.pgn`, `order-b.pgn` | A matched pair, one game each, identical moves but maximally different headers (`Event`/`Site`/`Date`/`Round`/`White`/`Black`) - designed to be fed as two separate *input files* with swappable priority, so a test can prove input order (not content) decides which copy survives (architecture.md §10.7's "input order is a retention priority"). |
+| `annotated-first-then-plain.pgn` | Identical moves, first copy carries a comment and a NAG, second (later) copy is plain - the mirror image of `annotated-vs-plain.pgn`. Proves the Phase 3 annotated-duplicate warning is scoped to what was actually *discarded*: since the plain copy is the one diverted to the audit file here, no warning should fire, even though the collection as a whole does contain an annotation. |
 
 ## malformed/
 

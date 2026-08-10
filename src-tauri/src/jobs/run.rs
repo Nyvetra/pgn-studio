@@ -401,6 +401,7 @@ pub async fn run_job(
 
             match publish_outcome {
                 Ok(published) => {
+                    warn_on_annotated_duplicates(&published, &mut warnings);
                     let metrics = compute_final_metrics(
                         &compiled,
                         &spec,
@@ -586,6 +587,47 @@ fn render_minimal_report(spec: &JobSpec, kind: ArtifactKind) -> String {
             "PGN Studio job report\nJob: {}\nOutput base name: {}\n",
             spec.name, spec.output.base_name
         ),
+    }
+}
+
+/// Phase 3 (architecture.md §24, §27): after a successful publish, if a
+/// duplicates-audit artifact was actually published, scan it for
+/// annotation markers and append an advisory `JobWarning` when it holds
+/// any (§10.7/§3.3/ADR-009: the warning never claims to know the kept copy
+/// is worse — see `errors::annotated_duplicates_suppressed`'s doc comment).
+///
+/// A scan I/O failure is logged and otherwise ignored: the job's real
+/// outcome (already `Succeeded` by the time this runs) does not depend on
+/// this best-effort advisory, and — unlike a mis-measured `ProcessingMetrics`
+/// field, which would go through `None` — there is no honest "unknown"
+/// warning to show for "the check itself could not run," so this simply
+/// does not add one, matching how `compute_final_metrics` below silently
+/// treats a `count_games_in_file` failure as "nothing to report" rather
+/// than a warning of its own.
+fn warn_on_annotated_duplicates(published: &[OutputArtifact], warnings: &mut Vec<JobWarning>) {
+    let Some(audit) = published
+        .iter()
+        .find(|a| a.kind == ArtifactKind::DuplicateGames)
+    else {
+        return;
+    };
+    match filesystem::duplicate_audit::scan_duplicate_audit_for_annotations(&audit.path) {
+        Ok(summary) if summary.games_with_annotations > 0 => {
+            warnings.push(errors::annotated_duplicates_suppressed(
+                summary.games_with_annotations,
+                &summary.examples,
+                summary.truncated,
+            ));
+        }
+        Ok(_) => {}
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                path = %audit.path.display(),
+                "could not scan the duplicates audit file for annotations; skipping the \
+                 advisory warning"
+            );
+        }
     }
 }
 

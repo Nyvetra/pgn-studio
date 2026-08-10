@@ -73,11 +73,28 @@ pub struct ProcessingMetrics {
 /// The closed error-code taxonomy (architecture.md §18.1; design-02 §5.1).
 ///
 /// This is the complete V1 set as enumerated in design-02 §5.1's
-/// "raised by" table. Real construction is intentionally NOT implemented
-/// here (see [`PublicError`]'s doc comment) — this Phase 1a module only
-/// needs the closed set to exist so [`JobResult`], [`PublicError`], and
-/// [`JobWarning`] can be typed completely rather than with a placeholder
-/// `String`.
+/// "raised by" table, plus one Phase 3 addition. Real construction is
+/// intentionally NOT implemented here (see [`PublicError`]'s doc comment) —
+/// this Phase 1a module only needs the closed set to exist so [`JobResult`],
+/// [`PublicError`], and [`JobWarning`] can be typed completely rather than
+/// with a placeholder `String`.
+///
+/// **`AnnotatedDuplicatesSuppressed` (Phase 3):** every later addition to
+/// this enum before Phase 3 (`crate::errors`'s `path_not_allowed`,
+/// `job_not_active`, `directory_not_readable_io`,
+/// `export_destination_collision`, `invalid_saved_manifest`) deliberately
+/// *reused* an existing variant rather than growing the enum, each with a
+/// doc comment explaining why the reused code was still an honest fit. This
+/// one variant breaks that pattern on purpose: architecture.md §24's Phase 3
+/// exit criterion and §27's risk table both name "annotated-duplicate
+/// warnings" as their own concern (a *content* advisory — "this audit file
+/// holds annotations you may want to look at" — not a procedural/technical
+/// failure), and none of the other 18 members describe anything like it.
+/// Reusing an unrelated one (say, `EngineOutputInvalid`, which normally means
+/// "this file does not look like valid PGN") would be more misleading than
+/// adding a correctly-named 19th member — the same honesty rule
+/// (`crate::errors`'s module doc: never blur what a code actually means)
+/// argues for a new variant here rather than against it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ErrorCode {
@@ -100,6 +117,12 @@ pub enum ErrorCode {
     TempCleanupFailed,
     HistoryWriteFailed,
     UnknownInternalError,
+    /// Warning-grade only (architecture.md §24 Phase 3, §27): a
+    /// `ReportAndKeepFirst` run published a non-empty duplicates-audit file
+    /// in which at least one diverted duplicate carries a comment, NAG, or
+    /// variation. See `crate::errors::annotated_duplicates_suppressed` and
+    /// `crate::filesystem::duplicate_audit`.
+    AnnotatedDuplicatesSuppressed,
 }
 
 /// The user-facing error shape (architecture.md §18.2; design-02 §5.2).

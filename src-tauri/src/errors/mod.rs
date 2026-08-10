@@ -707,6 +707,59 @@ pub fn history_write_failed(source: &std::io::Error) -> JobWarning {
 }
 
 // ---------------------------------------------------------------------
+// ANNOTATED_DUPLICATES_SUPPRESSED (warning-grade; Phase 3 addition)
+// ---------------------------------------------------------------------
+
+/// Raised by: the post-run duplicates-audit annotation scan
+/// (`crate::filesystem::duplicate_audit::scan_duplicate_audit_for_annotations`),
+/// only when a `ReportAndKeepFirst` run published a non-empty audit file
+/// and at least one diverted duplicate contains a comment, NAG, or
+/// variation (architecture.md §24 Phase 3 exit criterion, §27's named
+/// risk: "Duplicate copies contain different annotations → useful
+/// information could be suppressed").
+///
+/// Unlike every other constructor in this module, this is not a reuse of
+/// an existing §18.1 code — see `domain::result::ErrorCode`'s doc comment
+/// for why a genuinely new taxonomy member is the more honest choice here.
+///
+/// **Binding wording rule, restated from the task spec (architecture.md
+/// §3.3, §10.7; ADR-009):** this message must never claim to know which
+/// copy is "better," must state plainly that the kept copy may be missing
+/// what the message describes, and must attribute retention to input
+/// order — never to content quality. `annotated_duplicates_suppressed_*`
+/// tests below enforce the shape of this wording.
+pub fn annotated_duplicates_suppressed(
+    games_with_annotations: u64,
+    examples: &[String],
+    truncated: bool,
+) -> JobWarning {
+    let (noun, verb) = if games_with_annotations == 1 {
+        ("duplicate game", "contains")
+    } else {
+        ("duplicate games", "contain")
+    };
+    let mut message = format!(
+        "{games_with_annotations} suppressed {noun} in the duplicates audit file {verb} a \
+         comment, NAG, or variation that the kept copy may not have. PGN Studio always keeps \
+         the first copy in your input order and does not judge which copy is \"better\" — open \
+         the audit file to review what was set aside."
+    );
+    if !examples.is_empty() {
+        message.push_str(" Examples: ");
+        message.push_str(&examples.join(", "));
+        let more = (games_with_annotations as usize).saturating_sub(examples.len());
+        if more > 0 {
+            message.push_str(&format!(", and {more} more"));
+        }
+        message.push('.');
+    }
+    if truncated {
+        message.push_str(" (Only part of the audit file was checked for annotations.)");
+    }
+    JobWarning::from_redacted_parts(ErrorCode::AnnotatedDuplicatesSuppressed, message)
+}
+
+// ---------------------------------------------------------------------
 // UNKNOWN_INTERNAL_ERROR
 // ---------------------------------------------------------------------
 
@@ -866,6 +919,60 @@ mod tests {
         assert!(public
             .message()
             .contains("unsupported job file version 999"));
+    }
+
+    #[test]
+    fn annotated_duplicates_suppressed_names_the_count_and_examples() {
+        let warning = annotated_duplicates_suppressed(2, &["A vs B".to_string()], false);
+        assert_eq!(warning.code(), ErrorCode::AnnotatedDuplicatesSuppressed);
+        assert!(warning.message().contains("2 suppressed duplicate games"));
+        assert!(warning.message().contains("A vs B"));
+    }
+
+    #[test]
+    fn annotated_duplicates_suppressed_uses_singular_wording_for_one_game() {
+        let warning = annotated_duplicates_suppressed(1, &[], false);
+        // Subject-verb agreement matters for a message a real user reads:
+        // "1 ... game contains", never "1 ... game contain".
+        assert!(warning
+            .message()
+            .contains("1 suppressed duplicate game in the duplicates audit file contains"));
+    }
+
+    #[test]
+    fn annotated_duplicates_suppressed_uses_plural_wording_for_multiple_games() {
+        let warning = annotated_duplicates_suppressed(4, &[], false);
+        assert!(warning
+            .message()
+            .contains("4 suppressed duplicate games in the duplicates audit file contain"));
+    }
+
+    #[test]
+    fn annotated_duplicates_suppressed_never_claims_to_know_which_copy_is_better() {
+        // architecture.md §3.3/§10.7, ADR-009: "keep best copy" is out of
+        // scope; the wording must explicitly disclaim judging quality and
+        // attribute retention to input order, not content.
+        let warning = annotated_duplicates_suppressed(3, &[], false);
+        assert!(warning
+            .message()
+            .contains("does not judge which copy is \"better\""));
+        assert!(warning.message().contains("input order"));
+    }
+
+    #[test]
+    fn annotated_duplicates_suppressed_notes_extra_examples_beyond_the_cap() {
+        let warning = annotated_duplicates_suppressed(
+            5,
+            &["A vs B".to_string(), "C vs D".to_string()],
+            false,
+        );
+        assert!(warning.message().contains("and 3 more"));
+    }
+
+    #[test]
+    fn annotated_duplicates_suppressed_notes_when_the_scan_was_truncated() {
+        let warning = annotated_duplicates_suppressed(1, &[], true);
+        assert!(warning.message().contains("Only part of the audit file"));
     }
 
     #[allow(deprecated)]

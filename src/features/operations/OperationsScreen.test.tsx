@@ -124,6 +124,20 @@ describe("OperationsScreen", () => {
     expect(screen.getByLabelText("Keep the audit file")).toBeChecked();
   });
 
+  it("does not show the disk-based duplicate storage warning while no duplicate policy is selected", () => {
+    renderScreen(fullCapabilities());
+    expect(screen.queryByText(/temporary duplicate-lookup file/i)).not.toBeInTheDocument();
+  });
+
+  it("warns about temporary disk usage once a duplicate policy makes the disk-based storage option relevant (architecture.md §19.2)", async () => {
+    const user = userEvent.setup();
+    renderScreen(fullCapabilities());
+    await user.click(screen.getByRole("radio", { name: /Keep first copy, save the rest to an audit file/ }));
+    const warning = screen.getByText(/temporary duplicate-lookup file/i);
+    expect(warning).toBeInTheDocument();
+    expect(warning.textContent).toMatch(/free space/i);
+  });
+
   it("picking a check file calls select_input_files and displays the chosen path", async () => {
     const user = userEvent.setup();
     selectInputFiles.mockResolvedValueOnce({ status: "ok", data: ["C:\\master.pgn"] });
