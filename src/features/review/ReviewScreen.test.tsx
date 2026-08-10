@@ -131,6 +131,42 @@ describe("ReviewScreen", () => {
     expect(screen.queryByText(/best copy/i)).not.toBeInTheDocument();
   });
 
+  it("shows the active preset and its version on a fresh draft (Merge Safely, by construction)", () => {
+    renderScreen(true);
+    expect(
+      screen.getByText(/Started from preset: Merge Safely \(version 1\)\./),
+    ).toBeInTheDocument();
+  });
+
+  it('shows "Custom configuration" once a manual edit no longer matches any preset (architecture.md §12.1: presets are versioned and inspectable, not silently invalidated)', async () => {
+    function SeedCustomEdit() {
+      const { dispatch } = useWorkflow();
+      useEffect(() => {
+        // `removeMoveNumbers: true` alone (with everything else left at
+        // the fresh-draft default) is not part of ANY of the six presets'
+        // own `effect` - unlike e.g. `duplicates: "suppressKeepFirst"`
+        // alone, which would coincidentally match "New Games Against
+        // Master"'s own effect exactly and defeat the point of this test.
+        dispatch({ type: "SET_CLEANUP", patch: { removeMoveNumbers: true } });
+      }, [dispatch]);
+      return null;
+    }
+    render(
+      <WorkflowProvider>
+        <JobRunProvider>
+          <Seed ready />
+          <SeedCustomEdit />
+          <ReviewScreen />
+        </JobRunProvider>
+      </WorkflowProvider>,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Custom configuration — not an unmodified built-in preset\./),
+      ).toBeInTheDocument(),
+    );
+  });
+
   it("shows validation errors, warnings, and advisories from the backend", async () => {
     renderScreen(false);
     const warningsSection = await screen.findByRole("heading", { name: "Warnings" });

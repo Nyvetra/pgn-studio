@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { describe, expect, it } from "vitest";
 import { PRESETS, getPreset, matchesPreset } from "./presets";
-import { defaultArtifactPreferences, defaultOperationPlan } from "./defaults";
+import { defaultArtifactPreferences, defaultCleanupOptions, defaultOperationPlan } from "./defaults";
+import type { PresetEffect } from "./presets";
 
 describe("presets", () => {
   it("defines every preset id referenced by architecture.md §12.2", () => {
@@ -22,6 +23,19 @@ describe("presets", () => {
     for (const preset of PRESETS) {
       expect(preset.effect.operations.broken).toBe("discard");
       expect(preset.description.toLowerCase()).not.toContain("broken");
+    }
+  });
+
+  it("every preset is versioned with a positive integer (architecture.md §12.1)", () => {
+    for (const preset of PRESETS) {
+      expect(Number.isInteger(preset.version)).toBe(true);
+      expect(preset.version).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("all six presets start at version 1 (first implementation, none has changed since)", () => {
+    for (const preset of PRESETS) {
+      expect(preset.version).toBe(1);
     }
   });
 
@@ -57,6 +71,68 @@ describe("presets", () => {
       if (preset.effect.artifacts.duplicateGames === "audit") {
         expect(preset.effect.operations.duplicates).toBe("reportAndKeepFirst");
       }
+    }
+  });
+
+  describe("exact JobSpec diff per preset (architecture.md §12.1: a preset is a complete, inspectable JobSpec diff)", () => {
+    // Every expected value below is built only from `defaults.ts` (a
+    // separately-tested module, not `presets.ts`'s own internal `cleanupOf`/
+    // `artifacts` helpers), spread/overridden explicitly per preset. This is
+    // deliberate: reusing `presets.ts`'s own helpers to check `presets.ts`'s
+    // own output would be circular and could never catch a drift in either
+    // a shared default or an individual preset's override.
+    const baseCleanup = defaultCleanupOptions();
+    const baseArtifacts = defaultArtifactPreferences();
+    const strippedCleanup = { ...baseCleanup, removeComments: true, removeVariations: true, removeNags: true };
+
+    const expected: Record<(typeof PRESETS)[number]["id"], PresetEffect> = {
+      mergeSafely: {
+        operations: { ...defaultOperationPlan(), mode: "process", duplicates: "none" },
+        uniqueGames: true,
+        artifacts: { ...baseArtifacts },
+      },
+      cleanCollection: {
+        operations: { ...defaultOperationPlan(), mode: "process", duplicates: "reportAndKeepFirst" },
+        uniqueGames: true,
+        artifacts: { ...baseArtifacts, duplicateGames: "audit" },
+      },
+      minimalMainline: {
+        operations: {
+          ...defaultOperationPlan(),
+          mode: "process",
+          duplicates: "suppressKeepFirst",
+          cleanup: strippedCleanup,
+        },
+        uniqueGames: true,
+        artifacts: { ...baseArtifacts },
+      },
+      lucenaReady: {
+        operations: {
+          ...defaultOperationPlan(),
+          mode: "process",
+          duplicates: "reportAndKeepFirst",
+          cleanup: strippedCleanup,
+          eco: { enabled: true },
+        },
+        uniqueGames: true,
+        artifacts: { ...baseArtifacts, duplicateGames: "audit" },
+      },
+      validateOnly: {
+        operations: { ...defaultOperationPlan(), mode: "validateOnly", duplicates: "none" },
+        uniqueGames: false,
+        artifacts: { ...baseArtifacts },
+      },
+      newGamesAgainstMaster: {
+        operations: { ...defaultOperationPlan(), mode: "process", duplicates: "suppressKeepFirst" },
+        uniqueGames: true,
+        artifacts: { ...baseArtifacts },
+      },
+    };
+
+    for (const id of Object.keys(expected) as (keyof typeof expected)[]) {
+      it(`${id} produces exactly its documented JobSpec diff`, () => {
+        expect(getPreset(id).effect).toEqual(expected[id]);
+      });
     }
   });
 

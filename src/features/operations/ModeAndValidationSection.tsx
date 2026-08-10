@@ -11,6 +11,28 @@
  * (D-007 V-5). Only "discard" and "keep in main output" are offered, and
  * both say plainly that games with errors are reported in the log, never a
  * file of their own.
+ *
+ * Phase 4 corrections (verified against the real pinned engine,
+ * `phase4_integration.rs`):
+ *  - "Keep games with errors in the main output" no longer claims "nothing
+ *    is silently dropped". `--keepbroken` reliably rescues games with an
+ *    unplayable/illegal move, but does NOT rescue every malformation — a
+ *    game missing its result marker entirely can still be silently dropped
+ *    from (or have its move list silently stripped from) the output with
+ *    `--keepbroken` on, identically to how it behaves with it off
+ *    (`missing_result_marker_survives_keepbroken_identically_to_default` in
+ *    `phase4_integration.rs`). Overclaiming "nothing is dropped" here would
+ *    violate architecture.md §4.3.
+ *  - "Exclude games with inconsistent result tags" (`--nobadresults`) no
+ *    longer attributes its check to "the final position's outcome"
+ *    (checkmate/stalemate). Reading `apply.c` and reproducing both cases
+ *    empirically shows `--nobadresults` only ever rejects a game whose
+ *    *movetext's own trailing result token* (e.g. the score's final
+ *    "1-0"/"1/2-1/2") textually disagrees with its `Result` tag — a
+ *    Result-tag-vs-actual-checkmate mismatch (what `--fixresulttags` repairs)
+ *    is only ever warned about, never rejected by `--nobadresults`
+ *    (`nobadresults_does_not_exclude_a_checkmate_vs_tag_mismatch` in
+ *    `phase4_integration.rs`).
  */
 import type { EngineCapabilities, JobMode } from "../../ipc/client";
 import type { CleanupOptions, BrokenOutput } from "../../ipc/client";
@@ -40,7 +62,7 @@ const BROKEN_OPTIONS: readonly RadioOption<BrokenOutput>[] = [
   {
     value: "keepInMainOutput",
     label: "Keep games with errors in the main output",
-    help: "Broken games are included in the same output file as valid ones, so nothing is silently dropped. There is still no separate file for them; check the log to see which games had problems.",
+    help: "Most games pgn-extract cannot parse cleanly (for example one with an illegal move) are still included in the same output file as valid ones instead of being left out. A few kinds of error can still result in a game being left out, or having its moves stripped, even with this on — check the log to see which games had problems, since there is still no separate file for them.",
   },
 ];
 
@@ -81,7 +103,7 @@ export function ModeAndValidationSection({
       <h3>Result tags</h3>
       <Checkbox
         label="Exclude games with inconsistent result tags"
-        help="Skips games where the final position's outcome does not match the Result tag."
+        help='Skips games where the result written at the end of the moves (e.g. a trailing "1-0") disagrees with the Result tag at the top. This does not catch every kind of wrong result — for example a Result tag that disagrees with an actual checkmate on the board is only ever a warning in the log, never excluded by this option.'
         checked={cleanup.rejectBadResults}
         disabled={!loaded || !capabilities?.rejectBadResults}
         onCheckedChange={(rejectBadResults) => onCleanupChange({ rejectBadResults })}

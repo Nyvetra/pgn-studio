@@ -62,10 +62,19 @@ pub struct ProcessingMetrics {
     pub input_games: Option<u64>,
     pub output_games: Option<u64>,
     pub duplicate_games: Option<u64>,
-    /// Derivable only in the narrow cases design-02 §2.4 describes (no
-    /// filters, and duplicate policy is `None` or `ReportAndKeepFirst`);
-    /// `None` otherwise, since broken and filter-rejected games are
-    /// otherwise indistinguishable in the engine's own output.
+    /// **Always `None` in V1.** design-02 §2.4 originally scoped this as
+    /// derivable (`total - matched` from the final summary line) whenever no
+    /// filters were active and duplicate policy was `None`/`ReportAndKeepFirst`.
+    /// Phase 4 empirically disproved that against the real pinned engine:
+    /// depending on stream position, a game with a parse-recoverable defect
+    /// (e.g. a missing result marker) can be silently dropped from, or have
+    /// its moves silently stripped from, the published output while leaving
+    /// `total - matched` completely unchanged (see
+    /// `engine::command_compiler::MetricsPlan::broken_games` and
+    /// `phase4_integration.rs` for the reproducing fixtures). Since this can
+    /// under-report a real, nonzero broken-game count as `0` — precisely
+    /// what this struct's own binding rule above forbids — the compiler
+    /// never plans this metric as derivable, so it is always `None`.
     pub broken_games: Option<u64>,
     pub output_bytes: Option<u64>,
 }

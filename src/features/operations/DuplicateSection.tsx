@@ -147,7 +147,7 @@ export function DuplicateSection({
         <div className="check-file-picker">
           <TextField
             label="Master/check file (optional)"
-            help='Compare against this file too, without adding its games to the output — this is what "New Games Against Master" uses. Requires a duplicate-handling option above.'
+            help='Compare against this file too, without adding its games to the output — this is what "New Games Against Master" uses. Requires a duplicate-handling option above, and must be a single .pgn file (anything else is read as a list of filenames instead).'
             value={checkFile ?? ""}
             onValueChange={() => {
               /* read-only display; chosen via the Browse dialog only */

@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /** Plain-language operation summary (architecture.md §13.5). */
 import type { WorkflowState } from "../../state/workflowReducer";
+import { selectActivePreset } from "../../state/workflowReducer";
 import { DUPLICATE_POLICY_LABELS } from "../../types/workflow";
 import { compileFilters } from "../../state/filterMapping";
+import { getPreset } from "../../state/presets";
 
 export function OperationSummary({ state }: { state: WorkflowState }) {
   const { operations, uniqueGames, artifacts } = state;
+  const activePresetId = selectActivePreset(state);
+  const activePreset = activePresetId === "custom" ? null : getPreset(activePresetId);
   const filterPlan = compileFilters(state.filters);
   const activeFilterCount =
     filterPlan.tagRules.length +
@@ -19,10 +23,17 @@ export function OperationSummary({ state }: { state: WorkflowState }) {
     operations.cleanup.removeNags && "NAGs",
     operations.cleanup.removeMoveNumbers && "move numbers",
     operations.cleanup.removeResults && "movetext result markers",
+    operations.cleanup.removeTags.length > 0 &&
+      `the ${operations.cleanup.removeTags.join(", ")} tag${operations.cleanup.removeTags.length === 1 ? "" : "s"}`,
   ].filter(Boolean) as string[];
 
   return (
     <ul className="review-summary-list">
+      <li>
+        {activePreset
+          ? `Started from preset: ${activePreset.label} (version ${activePreset.version}).`
+          : "Custom configuration — not an unmodified built-in preset."}
+      </li>
       <li>
         {operations.mode === "validateOnly"
           ? "Validate every source file for errors; do not write a merged games file."
@@ -35,6 +46,16 @@ export function OperationSummary({ state }: { state: WorkflowState }) {
         {operations.broken === "keepInMainOutput"
           ? "kept in the main output"
           : "discarded (reported in the log only)"}
+        .
+      </li>
+      <li>
+        Inconsistent result tags:{" "}
+        {[
+          operations.cleanup.rejectBadResults && "games with a mismatched result are excluded",
+          operations.cleanup.fixResultTags && "resolvable ones are corrected automatically",
+        ]
+          .filter(Boolean)
+          .join("; ") || "left as found"}
         .
       </li>
       <li>

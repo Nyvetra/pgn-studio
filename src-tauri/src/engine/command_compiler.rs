@@ -109,10 +109,36 @@ pub struct MetricsPlan {
     pub input_games: bool,
     pub output_games: bool,
     pub duplicate_games: bool,
-    /// True only for the narrow case design-02 §2.4 verifies: no filters
-    /// active, and duplicate policy is `None` or `ReportAndKeepFirst` (never
-    /// `SuppressKeepFirst` — that combination was not part of the verified
-    /// fixture, DECISIONS-LEDGER.md D-007 V-2 only exercised `-d`).
+    /// **Always `false` in V1 — never derivable.** design-02 §2.4 originally
+    /// scoped this to "no filters active, and duplicate policy is `None` or
+    /// `ReportAndKeepFirst`", reasoning that filtered-out-but-valid games
+    /// were the only way `total.saturating_sub(matched)` (the final
+    /// `"N games matched out of M."` summary line) could be confused for a
+    /// broken-game count. Phase 4 empirically falsified that "narrow case is
+    /// safe" claim against the real pinned engine, with no filters active and
+    /// no duplicate handling involved at all: a game missing its result
+    /// marker (`fixtures/malformed/missing-result-marker.pgn`) is silently
+    /// invisible to *both* `M` and the matched count whenever it is the last
+    /// game in the merged input stream (`0 games matched out of 0` for that
+    /// fixture alone — the malformed game is not just unmatched, it is never
+    /// counted as "processed" at all), while the exact same fixture merged
+    /// ahead of a trailing valid game *is* counted as processed and matched,
+    /// but has its entire move list silently discarded from the published
+    /// output (replaced with just the bare `Result` tag value) — again with
+    /// zero effect on `total - matched`. Both are real data-loss/quality
+    /// events that this arithmetic reports as `0` broken games, indistinguishable
+    /// from a genuinely clean run. Since `compile` is pure (no filesystem
+    /// access) it cannot know ahead of time whether a job's input contains
+    /// this pattern, so no configuration-based gate can rescue the
+    /// derivation — unlike the filter case, this is a property of engine
+    /// *parse-recovery* behavior, not job configuration. Per the project's
+    /// binding "never substitute 0 for a metric that could not be measured"
+    /// rule (`domain::result::ProcessingMetrics`), the only honest value is
+    /// `false` here, always, so `ProcessingMetrics.broken_games` stays `None`
+    /// on every job. See `phase4_integration.rs`'s
+    /// `broken_games_metric_stays_none_even_though_a_game_was_silently_dropped`
+    /// and `missing_result_marker_is_invisible_to_the_matched_total_summary`
+    /// for the reproducing fixtures and real-engine proof.
     pub broken_games: bool,
     pub output_bytes: bool,
 }
@@ -363,17 +389,6 @@ pub fn compile(
         });
     }
 
-    let no_filters = spec.filters.tag_rules.is_empty()
-        && spec.filters.fen_pattern.is_none()
-        && spec.filters.move_bounds.is_none()
-        && !spec.filters.checkmate_only
-        && spec.filters.setup_policy == SetupPolicy::Any
-        && spec
-            .filters
-            .textual_variations
-            .iter()
-            .all(|v| v.trim().is_empty());
-
     let metrics_plan = MetricsPlan {
         processed_games: true,
         input_games: true,
@@ -381,11 +396,10 @@ pub fn compile(
         duplicate_games: spec.output.duplicate_games == DuplicateOutput::Audit
             && temp_dupes_path.is_some()
             && spec.runtime.count_output_games,
-        broken_games: no_filters
-            && matches!(
-                spec.operations.duplicates,
-                DuplicatePolicy::None | DuplicatePolicy::ReportAndKeepFirst
-            ),
+        // Never derivable — see the field doc on `MetricsPlan::broken_games`
+        // for the empirical (Phase 4) reason this is unconditionally false,
+        // not gated on filters/duplicate policy the way it used to be.
+        broken_games: false,
         output_bytes: !final_outputs.is_empty(),
     };
 
@@ -975,13 +989,23 @@ mod tests {
         assert!(!compiled.metrics_plan.broken_games);
     }
 
+    /// Phase 4 correction (see `MetricsPlan::broken_games`'s field doc): this
+    /// scenario — no filters, `ReportAndKeepFirst` — is exactly the case
+    /// design-02 §2.4 originally called "safe" and this test used to assert
+    /// `true` for. Empirical testing against the real engine
+    /// (`phase4_integration.rs`) proved that claim false: a game missing its
+    /// result marker can be silently dropped from, or have its moves
+    /// silently stripped from, a published output with **zero** effect on
+    /// `total - matched`, in this exact configuration. `broken_games` is now
+    /// unconditionally `false`, so this test documents "still false here
+    /// too" rather than the old "true here specifically".
     #[test]
-    fn broken_games_metric_derivable_with_no_filters_and_report_and_keep_first() {
+    fn broken_games_metric_is_never_derivable_not_even_in_the_previously_assumed_safe_case() {
         let mut spec = minimal_spec();
         spec.operations.duplicates = DuplicatePolicy::ReportAndKeepFirst;
         spec.output.duplicate_games = DuplicateOutput::Audit;
         let compiled = compile(&spec, &minimal_caps(), &minimal_layout()).unwrap();
-        assert!(compiled.metrics_plan.broken_games);
+        assert!(!compiled.metrics_plan.broken_games);
     }
 
     #[test]
