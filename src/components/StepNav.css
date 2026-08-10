@@ -1,0 +1,9 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.step-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}

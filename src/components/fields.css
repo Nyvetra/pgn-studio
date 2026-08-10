@@ -1,0 +1,147 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.field__label {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.field__required {
+  color: var(--color-danger);
+  margin-left: 0.2ch;
+}
+
+.field__help {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.field__error {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  margin: 0;
+  font-weight: 600;
+}
+
+.field__control {
+  font: inherit;
+  font-size: var(--font-size-md);
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  max-width: 100%;
+}
+
+.field__control:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.field__control[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.field-row {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.field-row > .field {
+  flex: 1 1 12rem;
+}
+
+.check-field {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.check-field__control {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.15rem;
+  accent-color: var(--color-primary);
+  flex: none;
+}
+
+.check-field__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.check-field__label {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.check-field__help {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.check-field--disabled .check-field__label,
+.check-field--disabled .check-field__help {
+  opacity: 0.6;
+}
+
+fieldset.field-group {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin: 0 0 var(--space-4);
+}
+
+fieldset.field-group > legend {
+  font-weight: 700;
+  font-size: var(--font-size-md);
+  padding: 0 var(--space-1);
+}
+
+.radio-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+.radio-option__control {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.15rem;
+  accent-color: var(--color-primary);
+  flex: none;
+}
+
+.radio-option__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.radio-option__label {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+.radio-option__help {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.radio-option--disabled {
+  opacity: 0.6;
+}

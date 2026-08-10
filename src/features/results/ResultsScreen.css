@@ -1,0 +1,6 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.results-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}

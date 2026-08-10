@@ -1,0 +1,37 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.progress-indicator__track {
+  width: 100%;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.progress-indicator__bar {
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+  animation: progress-indicator-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes progress-indicator-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+/* The global reduced-motion rule already zeroes animation-duration; give the
+ * bar a sensible static resting position instead of a one-frame freeze at
+ * an arbitrary point mid-slide. */
+@media (prefers-reduced-motion: reduce) {
+  .progress-indicator__bar {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
+}

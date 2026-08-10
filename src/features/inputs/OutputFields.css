@@ -1,0 +1,15 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.output-fields__directory {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.output-fields__directory .field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.output-fields__directory .btn {
+  margin-bottom: var(--space-4);
+}

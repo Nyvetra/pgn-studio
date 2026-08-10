@@ -1,0 +1,41 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.metric-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: var(--space-3);
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-md);
+}
+
+.metric__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.metric__value {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.metric__value--unknown {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.metric__hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}

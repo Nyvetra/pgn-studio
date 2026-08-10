@@ -1,0 +1,74 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid;
+  margin-bottom: var(--space-4);
+}
+
+.banner__glyph {
+  flex: none;
+  font-size: 1.1rem;
+  line-height: 1.4;
+}
+
+.banner__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.banner__label {
+  margin: 0 0 0.15rem;
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+}
+
+.banner__content {
+  font-size: var(--font-size-sm);
+}
+
+.banner__content :first-child {
+  margin-top: 0;
+}
+.banner__content :last-child {
+  margin-bottom: 0;
+}
+
+.banner--info {
+  background: var(--color-info-bg);
+  border-color: var(--color-info-border);
+  color: var(--color-text);
+}
+.banner--info .banner__glyph {
+  color: var(--color-info);
+}
+
+.banner--warning {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+  color: var(--color-text);
+}
+.banner--warning .banner__glyph {
+  color: var(--color-warning);
+}
+
+.banner--danger {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-text);
+}
+.banner--danger .banner__glyph {
+  color: var(--color-danger);
+}
+
+.banner--success {
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
+  color: var(--color-text);
+}
+.banner--success .banner__glyph {
+  color: var(--color-success);
+}

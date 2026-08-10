@@ -1,0 +1,15 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.app-shell {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-6);
+}
+
+.app-shell__title {
+  font-size: var(--font-size-xl);
+  margin: 0 0 var(--space-5);
+}
+
+.app-shell__content {
+  min-width: 0;
+}

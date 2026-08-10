@@ -8,7 +8,18 @@
  * webview.
  */
 import "@testing-library/jest-dom/vitest";
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
+import { cleanup } from "@testing-library/react";
+
+// This project's vite.config.ts does not set `test.globals: true`, so
+// @testing-library/react's own auto-cleanup (which detects a *global*
+// `afterEach`) never registers itself — without this, each `render()` call
+// within a test file would keep accumulating in `document.body` instead of
+// unmounting after its own test, corrupting every later `getByRole`/query
+// in that file with leftover elements from earlier tests.
+afterEach(() => {
+  cleanup();
+});
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(() =>

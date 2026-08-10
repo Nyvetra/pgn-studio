@@ -1,0 +1,36 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.review-summary-list,
+.review-source-list,
+.review-artifact-list {
+  margin: 0 0 var(--space-4);
+  padding-left: 1.4rem;
+}
+
+.review-summary-list li,
+.review-artifact-list li {
+  margin-bottom: 0.35rem;
+}
+
+.review-source-list {
+  list-style: decimal;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: var(--font-size-sm);
+}
+
+.review-source-list li {
+  overflow-wrap: anywhere;
+  margin-bottom: 0.2rem;
+}
+
+.review-artifact-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.review-artifact-list li {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}

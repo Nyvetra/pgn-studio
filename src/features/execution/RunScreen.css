@@ -1,0 +1,46 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.run-progress {
+  margin: var(--space-4) 0;
+  padding: var(--space-4);
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-md);
+}
+
+.run-progress h3 {
+  margin-top: 0;
+}
+
+.run-progress__facts {
+  display: flex;
+  gap: var(--space-6);
+  margin: var(--space-4) 0 0;
+}
+
+.run-progress__facts dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.run-progress__facts dd {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+}
+
+.run-progress__last-line {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.run-artifact-list {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: var(--font-size-sm);
+  margin: 0 0 var(--space-4);
+}
+
+.run-artifact-list li {
+  margin-bottom: 0.3rem;
+  overflow-wrap: anywhere;
+}

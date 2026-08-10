@@ -1,24 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
- * Placeholder for the application's screen/route map.
+ * The application's screen/route map (architecture.md §13.1): the
+ * five-step MVP workflow, `Files -> Operations -> Filters -> Review -> Run
+ * & Results`.
  *
- * architecture.md §13.1 defines the five-step MVP workflow:
- *   1. Files -> 2. Operations -> 3. Filters -> 4. Review -> 5. Run & Results
- *
- * Phase 0 ships a single diagnostic screen (see `App.tsx`) and does not
- * need real navigation yet. This module exists so Phase 2 has an obvious
- * place to introduce routing/step state instead of inventing a new
- * convention at that point.
+ * Re-exported from `src/types/workflow.ts` rather than duplicated here —
+ * that module is also where `WorkflowState`/`workflowReducer`
+ * (`src/state/workflowReducer.ts`) get their step type from, and a route
+ * list that could drift from the one actually driving navigation would be
+ * worse than no route list at all.
  */
-
-/** Screens planned for the Version 1 MVP workflow (architecture.md §13.1). */
-export type AppRoute =
-  | "diagnostics"
-  | "files"
-  | "operations"
-  | "filters"
-  | "review"
-  | "run-results";
-
-/** Only "diagnostics" exists until Phase 2 implements the real workflow. */
-export const APP_ROUTES: readonly AppRoute[] = ["diagnostics"];
+export { WORKFLOW_STEPS as APP_ROUTES, STEP_LABELS, type WorkflowStep as AppRoute } from "../types/workflow";

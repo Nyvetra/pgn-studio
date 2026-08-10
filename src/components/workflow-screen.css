@@ -1,0 +1,30 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Shared layout rules for every Files/Operations/Filters/Review/Run/Results
+ * screen, so heading rhythm and section spacing stay consistent without
+ * each screen re-declaring them. */
+.workflow-screen__intro {
+  color: var(--color-text-muted);
+  max-width: 60ch;
+  margin: 0 0 var(--space-5);
+}
+
+.workflow-screen h2 {
+  font-size: var(--font-size-xl);
+  margin: 0 0 var(--space-2);
+}
+
+.workflow-screen h3 {
+  font-size: var(--font-size-lg);
+  margin: 0 0 var(--space-1);
+}
+
+.workflow-screen section + section {
+  margin-top: var(--space-6);
+}
+
+.workflow-screen__section-help {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  max-width: 60ch;
+  margin: 0 0 var(--space-3);
+}
