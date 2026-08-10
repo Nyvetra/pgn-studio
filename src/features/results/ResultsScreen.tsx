@@ -2,21 +2,21 @@
 /**
  * Results screen (architecture.md §13.7): status, elapsed time, metrics
  * (unknown values as "Not available", never 0), artifact list, View Log,
- * Rerun Job, Start New Job.
+ * Save Job, Rerun Job, Start New Job.
  *
- * "Save Job" (task spec, §13.7): every completed job is already recorded
- * to the bounded local job history automatically by the backend
- * (`application::jobs::record_history`, called unconditionally after every
- * run) — there is no separate save *action* to perform, so this screen
- * states that fact rather than adding a button with nothing real behind
- * it. There is no `export_job_spec`-style IPC command to save a job to an
- * arbitrary user-chosen file, and browsing/reopening saved job history is
- * explicitly Version 1.1 scope (`src/features/history/README.md`) — both
- * reported rather than worked around; see the Phase 2b report.
+ * "Save Job" exports the completed job's full reproducible manifest
+ * (architecture.md §15.3's checklist - schema version, app/engine
+ * identity, inputs, options, argv, timestamps, artifacts) to a
+ * user-chosen file via the real `export_job_manifest` command and the
+ * native save dialog. This is distinct from the automatic local job
+ * history every completed run already gets (`application::jobs::
+ * record_history`, unconditional) - that history is bounded and local;
+ * "Save Job" is an explicit, user-chosen, portable copy.
  */
 import { useState } from "react";
 import { useWorkflow } from "../../state/useWorkflow";
 import type { JobRunState } from "../../state/jobRunReducer";
+import { exportJobManifest } from "../../ipc/client";
 import { formatBytes, formatCount, formatDuration } from "../../state/formatters";
 import { Banner, type BannerTone } from "../../components/Banner";
 import { Button } from "../../components/Button";
@@ -26,6 +26,12 @@ import "./ResultsScreen.css";
 import { ArtifactList } from "./ArtifactList";
 import { LiveLog } from "../execution/LiveLog";
 import { useJobRunContext } from "../execution/useJobRunContext";
+
+type SaveJobState =
+  | { status: "idle" }
+  | { status: "saving" }
+  | { status: "saved"; path: string }
+  | { status: "error"; message: string };
 
 const STATUS_INFO: Record<"succeeded" | "failed" | "cancelled", { label: string; tone: BannerTone }> = {
   succeeded: { label: "Job succeeded", tone: "success" },
@@ -45,6 +51,7 @@ export function ResultsScreen() {
   const { dispatch } = useWorkflow();
   const jobRun = useJobRunContext();
   const [logVisible, setLogVisible] = useState(false);
+  const [saveJob, setSaveJob] = useState<SaveJobState>({ status: "idle" });
 
   const { result } = jobRun.state;
   const artifacts = result?.artifacts ?? jobRun.state.artifacts;
@@ -67,6 +74,23 @@ export function ResultsScreen() {
   function handleStartNew() {
     jobRun.reset();
     dispatch({ type: "RESET_FOR_NEW_JOB" });
+  }
+
+  async function handleSaveJob() {
+    const jobId = jobRun.state.jobId;
+    if (!jobId) return;
+    setSaveJob({ status: "saving" });
+    const result = await exportJobManifest(jobId);
+    if (result.status === "error") {
+      setSaveJob({ status: "error", message: result.error.message });
+      return;
+    }
+    if (result.data === null) {
+      // User cancelled the save dialog - back to idle, no error to show.
+      setSaveJob({ status: "idle" });
+      return;
+    }
+    setSaveJob({ status: "saved", path: result.data });
   }
 
   return (
@@ -127,7 +151,21 @@ export function ResultsScreen() {
         history.
       </Banner>
 
+      {saveJob.status === "saved" && (
+        <Banner tone="success" role="status">
+          Job file saved to <code>{saveJob.path}</code>.
+        </Banner>
+      )}
+      {saveJob.status === "error" && (
+        <Banner tone="danger" role="alert">
+          {saveJob.message}
+        </Banner>
+      )}
+
       <div className="results-actions">
+        <Button variant="secondary" onClick={() => void handleSaveJob()} busy={saveJob.status === "saving"}>
+          Save Job
+        </Button>
         <Button variant="secondary" onClick={handleRerun}>
           Rerun Job
         </Button>

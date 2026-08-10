@@ -16,6 +16,7 @@ const cancelJob = vi.fn();
 const getJob = vi.fn();
 const openPath = vi.fn();
 const revealPath = vi.fn();
+const exportJobManifest = vi.fn();
 
 vi.mock("../../ipc/client", async () => {
   const actual = await vi.importActual<typeof import("../../ipc/client")>("../../ipc/client");
@@ -26,6 +27,7 @@ vi.mock("../../ipc/client", async () => {
     getJob: (...args: unknown[]) => getJob(...args),
     openPath: (...args: unknown[]) => openPath(...args),
     revealPath: (...args: unknown[]) => revealPath(...args),
+    exportJobManifest: (...args: unknown[]) => exportJobManifest(...args),
   };
 });
 
@@ -188,6 +190,7 @@ beforeEach(() => {
   getJob.mockReset().mockResolvedValue({ status: "error", error: { code: "INVALID_JOB_SPEC" } });
   openPath.mockReset().mockResolvedValue({ status: "ok", data: null });
   revealPath.mockReset().mockResolvedValue({ status: "ok", data: null });
+  exportJobManifest.mockReset().mockResolvedValue({ status: "ok", data: "C:\\out\\clean.pgnstudio-job.json" });
   // jsdom exposes `navigator.clipboard` as a getter-only property, so a
   // plain assignment throws — redefine it instead. jsdom also does not
   // actually implement `document.execCommand`'s copy behavior, so that is
@@ -290,9 +293,10 @@ describe("ResultsScreen", () => {
     expect(screen.queryByRole("log")).not.toBeInTheDocument();
   });
 
-  it("states that the job has been saved to history, and offers Rerun Job / Start New Job", async () => {
+  it("states that the job has been saved to history, and offers Save/Rerun Job / Start New Job", async () => {
     await renderCompleted();
     expect(screen.getByText(/added to your local job history/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Job" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rerun Job" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start New Job" })).toBeInTheDocument();
   });
@@ -307,5 +311,32 @@ describe("ResultsScreen", () => {
     const user = await renderCompleted();
     await user.click(screen.getByRole("button", { name: "Start New Job" }));
     expect(screen.getByTestId("step")).toHaveTextContent("files");
+  });
+
+  it("Save Job exports the job manifest via the real IPC command and confirms the saved path", async () => {
+    const user = await renderCompleted();
+    await user.click(screen.getByRole("button", { name: "Save Job" }));
+    expect(exportJobManifest).toHaveBeenCalledWith(JOB_ID);
+    expect(await screen.findByText(/Job file saved to/)).toBeInTheDocument();
+    expect(screen.getByText("C:\\out\\clean.pgnstudio-job.json")).toBeInTheDocument();
+  });
+
+  it("Save Job shows nothing extra when the user cancels the save dialog", async () => {
+    exportJobManifest.mockReset().mockResolvedValue({ status: "ok", data: null });
+    const user = await renderCompleted();
+    await user.click(screen.getByRole("button", { name: "Save Job" }));
+    await waitFor(() => expect(exportJobManifest).toHaveBeenCalled());
+    expect(screen.queryByText(/Job file saved to/)).not.toBeInTheDocument();
+  });
+
+  it("Save Job shows an error banner when the export fails", async () => {
+    exportJobManifest.mockReset().mockResolvedValue({
+      status: "error",
+      error: { code: "OUTPUT_NOT_WRITABLE", message: "The chosen folder is not writable." },
+    });
+    const user = await renderCompleted();
+    await user.click(screen.getByRole("button", { name: "Save Job" }));
+    const alert = await screen.findByText("The chosen folder is not writable.");
+    expect(alert).toBeInTheDocument();
   });
 });

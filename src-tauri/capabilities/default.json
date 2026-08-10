@@ -1,11 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Phase 2a capability set for the main window (architecture.md §16.3): only the safe core defaults (window/app/event/resource basics, which already include event listen/emit - core:default composes core:event:default) plus the three plugin permissions the IPC command surface genuinely needs. The dialog and opener plugins are called only from Rust command handlers (select_input_files/select_input_directory/select_output_directory, reveal_path, open_path) - never invoked directly by the frontend - and every reveal_path/open_path call is additionally allowlist-checked in Rust against job history/artifacts before the plugin is called (application::paths::resolve_allowed_path). No shell execution, no arbitrary command spawning, and no broad filesystem access are granted; the sidecar is invoked only via the engine module's own verified-path resolver, which the webview cannot name or reach.",
+  "description": "Capability set for the main window (architecture.md §16.3): only the safe core defaults (window/app/event/resource basics, which already include event listen/emit - core:default composes core:event:default) plus the plugin permissions the IPC command surface genuinely needs. The dialog and opener plugins are called only from Rust command handlers (select_input_files/select_input_directory/select_output_directory, reveal_path, open_path, export_job_manifest) - never invoked directly by the frontend. dialog:allow-save is scoped to exactly one caller, export_job_manifest ('Save Job', architecture.md §13.7), whose destination is additionally validated in Rust (filesystem::export::validate_export_destination: parent-directory writability, reserved device names, non-aliasing against the job's own input/artifact paths) before anything is written - the frontend never writes files directly. Every reveal_path/open_path call is additionally allowlist-checked in Rust against job history/artifacts before the plugin is called (application::paths::resolve_allowed_path). No shell execution, no arbitrary command spawning, and no broad filesystem access are granted; the sidecar is invoked only via the engine module's own verified-path resolver, which the webview cannot name or reach.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "dialog:allow-open",
+    "dialog:allow-save",
     "opener:allow-open-path",
     "opener:allow-reveal-item-in-dir"
   ]

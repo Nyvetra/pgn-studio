@@ -13,6 +13,12 @@ export const commands = {
 	revealPath: (path: string) => typedError<null, PublicError>(__TAURI_INVOKE("reveal_path", { path })),
 	openPath: (path: string) => typedError<null, PublicError>(__TAURI_INVOKE("open_path", { path })),
 	inspectInputs: (paths: string[]) => typedError<InputInspectionDto[], PublicError>(__TAURI_INVOKE("inspect_inputs", { paths })),
+	/**
+	 *  "Add Folder" (architecture.md §13.2): scans `directory` for candidate
+	 *  `.pgn` inputs and returns them already inspected, for review before
+	 *  they are added to the source list.
+	 */
+	scanInputDirectory: (directory: string, options: ScanInputDirectoryOptions) => typedError<DirectoryScanDto, PublicError>(__TAURI_INVOKE("scan_input_directory", { directory, options })),
 	validateJob: (spec: JobSpec) => typedError<ValidationReportDto, PublicError>(__TAURI_INVOKE("validate_job", { spec })),
 	compileJobPreview: (spec: JobSpec) => typedError<CommandPreviewDto, PublicError>(__TAURI_INVOKE("compile_job_preview", { spec })),
 	startJob: (spec: JobSpec) => typedError<JobAcceptedDto, PublicError>(__TAURI_INVOKE("start_job", { spec })),
@@ -20,6 +26,12 @@ export const commands = {
 	getJob: (jobId: string) => typedError<JobRecordDto, PublicError>(__TAURI_INVOKE("get_job", { jobId })),
 	listRecentJobs: (limit: number) => typedError<JobSummaryDto[], PublicError>(__TAURI_INVOKE("list_recent_jobs", { limit })),
 	deleteJobHistory: (jobId: string) => typedError<null, PublicError>(__TAURI_INVOKE("delete_job_history", { jobId })),
+	/**
+	 *  "Save Job" (architecture.md §13.7): exports a completed job's
+	 *  reproducible manifest to a user-chosen file via the native save dialog.
+	 *  `Ok(None)` means the user cancelled the dialog - not an error.
+	 */
+	exportJobManifest: (jobId: string) => typedError<string | null, PublicError>(__TAURI_INVOKE("export_job_manifest", { jobId })),
 	getSettings: () => typedError<SettingsDto, PublicError>(__TAURI_INVOKE("get_settings")),
 	updateSettings: (patch: SettingsPatchDto_Deserialize) => typedError<SettingsDto, PublicError>(__TAURI_INVOKE("update_settings", { patch })),
 };
@@ -116,6 +128,27 @@ export type ConflictPolicy = "fail" | "addNumericSuffix" | "replaceAfterConfirma
 export type CriteriaFilePreviewDto = {
 	relativePath: string,
 	content: string,
+};
+
+/**
+ *  `scan_input_directory` response: the matched files, already run through
+ *  the exact same [`inspect_inputs`] pipeline "Add Files" uses (so sizes,
+ *  readability, and warnings are computed identically - never duplicated
+ *  logic), plus enough truncation/scope metadata for the Files screen to
+ *  show an honest "found N files..." review before anything is actually
+ *  added (architecture.md §13.2).
+ */
+export type DirectoryScanDto = {
+	files: InputInspectionDto[],
+	/**
+	 *  Echoes back what was actually used, so the UI can label the result
+	 *  accurately ("12 files, including subfolders") without trusting its
+	 *  own possibly-stale local state.
+	 */
+	recursive: boolean,
+	directoriesScanned: number,
+	truncated: boolean,
+	truncationNotes: string[],
 };
 
 /**
@@ -767,6 +800,29 @@ export type RuntimeOptions = {
 	 *  what the caller actually asked to have measured.
 	 */
 	countOutputGames: boolean,
+};
+
+/**
+ *  `scan_input_directory` request options - see
+ *  `filesystem::folder_scan::ScanOptions` (the internal, non-IPC-facing
+ *  twin this is converted into) for the full recursion-default rationale.
+ *  A separate wire type rather than reusing that one directly for the same
+ *  reason the rest of this codebase keeps `filesystem`/`engine` internals
+ *  off the IPC boundary (design-02's "no wire type leaks an internal-only
+ *  shape" convention - see `application::jobs::CommandPreviewDto`'s own
+ *  doc comment for the identical reasoning applied to
+ *  `engine::command_compiler::CompiledEngineCommand`).
+ */
+export type ScanInputDirectoryOptions = {
+	/**
+	 *  Whether to descend into subfolders. The frontend must default this
+	 *  to `false` and surface it as an explicit "Include subfolders"
+	 *  control - see `filesystem::folder_scan`'s module doc comment for why
+	 *  non-recursive is the binding default.
+	 */
+	recursive: boolean,
+	/**  The §11.2 "advanced override" for extensionless/non-`.pgn` files. */
+	includeAllExtensions: boolean,
 };
 
 /**

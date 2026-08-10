@@ -11,12 +11,14 @@ const selectInputFiles = vi.fn();
 const selectInputDirectory = vi.fn();
 const selectOutputDirectory = vi.fn();
 const inspectInputs = vi.fn();
+const scanInputDirectory = vi.fn();
 
 vi.mock("../../ipc/client", () => ({
   selectInputFiles: (...args: unknown[]) => selectInputFiles(...args),
   selectInputDirectory: (...args: unknown[]) => selectInputDirectory(...args),
   selectOutputDirectory: (...args: unknown[]) => selectOutputDirectory(...args),
   inspectInputs: (...args: unknown[]) => inspectInputs(...args),
+  scanInputDirectory: (...args: unknown[]) => scanInputDirectory(...args),
 }));
 
 function renderFilesScreen() {
@@ -45,6 +47,10 @@ beforeEach(() => {
   selectInputDirectory.mockReset().mockResolvedValue({ status: "ok", data: null });
   selectOutputDirectory.mockReset().mockResolvedValue({ status: "ok", data: null });
   inspectInputs.mockReset().mockResolvedValue({ status: "ok", data: [] });
+  scanInputDirectory.mockReset().mockResolvedValue({
+    status: "ok",
+    data: { files: [], recursive: false, directoriesScanned: 1, truncated: false, truncationNotes: [] },
+  });
 });
 
 describe("FilesScreen", () => {
@@ -101,13 +107,38 @@ describe("FilesScreen", () => {
     expect(await screen.findByText("4 KB")).toBeInTheDocument();
   });
 
-  it("shows the folder-scanning limitation notice honestly instead of pretending to enumerate files", async () => {
+  it("Add Folder scans the chosen folder and adds the reviewed files to the source list", async () => {
     const user = userEvent.setup();
     selectInputDirectory.mockResolvedValueOnce({ status: "ok", data: "C:\\collection" });
+    scanInputDirectory.mockResolvedValueOnce({
+      status: "ok",
+      data: {
+        files: [
+          {
+            path: "C:\\collection\\a.pgn",
+            displayName: "a.pgn",
+            sizeBytes: 1024,
+            modifiedAt: null,
+            isReadable: true,
+            extensionOk: true,
+            sha256: null,
+            warnings: [],
+          },
+        ],
+        recursive: false,
+        directoriesScanned: 1,
+        truncated: false,
+        truncationNotes: [],
+      },
+    });
     renderFilesScreen();
     await user.click(screen.getByRole("button", { name: "Add Folder" }));
-    expect(await screen.findByText(/can.t scan a folder.s contents/)).toBeInTheDocument();
-    expect(screen.getByText(/C:\\collection/)).toBeInTheDocument();
+    expect(scanInputDirectory).toHaveBeenCalledWith("C:\\collection", {
+      recursive: false,
+      includeAllExtensions: false,
+    });
+    await user.click(await screen.findByRole("button", { name: "Add 1 File" }));
+    expect(await screen.findByText("a.pgn")).toBeInTheDocument();
   });
 
   it("hides the duplicate-retention-order note when duplicate handling is off (the default)", () => {

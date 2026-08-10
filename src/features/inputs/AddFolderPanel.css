@@ -1,0 +1,73 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+.add-folder-panel {
+  display: inline-block;
+}
+
+.add-folder-panel__review {
+  margin-top: var(--space-3);
+  text-align: left;
+}
+
+.add-folder-panel__directory code {
+  overflow-wrap: anywhere;
+}
+
+.add-folder-panel__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.add-folder-panel__summary {
+  font-weight: 600;
+}
+
+.add-folder-panel__truncation {
+  color: var(--color-warning);
+}
+
+.add-folder-panel__preview {
+  list-style: none;
+  margin: var(--space-2) 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.add-folder-panel__preview li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.add-folder-panel__preview li:last-child {
+  border-bottom: none;
+}
+
+.add-folder-panel__preview-name {
+  overflow-wrap: anywhere;
+}
+
+.add-folder-panel__preview-meta {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.add-folder-panel__preview-more {
+  justify-content: center;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.add-folder-panel__actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}

@@ -6,6 +6,8 @@
 //! lives behind this module - the rest of the app (and definitely the
 //! frontend) never touches paths directly.
 
+pub mod export;
+pub mod folder_scan;
 pub mod identity;
 pub mod manifest;
 pub mod publish;

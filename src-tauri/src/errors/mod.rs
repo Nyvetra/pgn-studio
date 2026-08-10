@@ -558,6 +558,88 @@ pub fn path_not_allowed(path: &Path) -> PublicError {
 }
 
 // ---------------------------------------------------------------------
+// INPUT_NOT_READABLE (Phase 2c addition: directory variant, "Add Folder")
+// ---------------------------------------------------------------------
+
+/// Raised by: `scan_input_directory`'s root-directory read failure
+/// (architecture.md §13.2 "Add Folder"). Reuses `InputNotReadable` - the
+/// same underlying hazard as a source file that cannot be opened, just for
+/// the folder the user picked to scan rather than a single PGN, matching
+/// the precedent [`path_not_allowed`]/[`job_not_active`] already set for
+/// reusing an existing code with new, situation-specific wording rather
+/// than adding a 20th taxonomy member.
+pub fn directory_not_readable_io(path: &Path, source: &std::io::Error) -> PublicError {
+    let technical_id = new_technical_id();
+    log_technical_detail(
+        technical_id,
+        ErrorCode::InputNotReadable,
+        "reading the selected folder for Add Folder",
+        source,
+    );
+    PublicError::from_redacted_parts(
+        ErrorCode::InputNotReadable,
+        "Folder not readable",
+        format!(
+            "\"{}\" could not be read ({}).",
+            display_path(path),
+            classify_io_error(source)
+        ),
+        Some("Check the folder still exists and that you have permission to read it.".to_string()),
+        None,
+        technical_id,
+    )
+}
+
+// ---------------------------------------------------------------------
+// INPUT_OUTPUT_COLLISION (Phase 2c addition: export-destination variant,
+// "Save Job")
+// ---------------------------------------------------------------------
+
+/// Raised by: `export_job_manifest`'s destination check (architecture.md
+/// §11.1's "no backend command may open a source PGN with write access",
+/// applied to a job-manifest export target). Reuses `InputOutputCollision`
+/// for the same reason [`path_not_allowed`] reuses an existing code: this is
+/// exactly the same underlying hazard (writing over a file the job itself
+/// depends on or produced), just for the manifest-export flow rather than
+/// the PGN-processing flow.
+pub fn export_destination_collision(destination: &Path, colliding_with: &Path) -> PublicError {
+    PublicError::from_redacted_parts(
+        ErrorCode::InputOutputCollision,
+        "Save location matches a job file",
+        format!(
+            "\"{}\" is the same file as \"{}\", which this job already uses.",
+            display_path(destination),
+            display_path(colliding_with)
+        ),
+        Some("Choose a different file name or folder.".to_string()),
+        None,
+        new_technical_id(),
+    )
+}
+
+// ---------------------------------------------------------------------
+// INVALID_JOB_SPEC (Phase 2c addition: saved-manifest variant, "Save Job"
+// re-validation)
+// ---------------------------------------------------------------------
+
+/// Raised by: `filesystem::manifest::parse_and_revalidate_exported_manifest`
+/// (architecture.md §16.1's threat model - a saved job file is untrusted
+/// input, never assumed genuine merely because it parses as JSON). Reuses
+/// `InvalidJobSpec` for the same reason [`invalid_job_spec`] itself is
+/// reused throughout this module for "the input you gave me is rejected"
+/// shapes that do not have their own §18.1 taxonomy member.
+pub fn invalid_saved_manifest(reason: &str) -> PublicError {
+    PublicError::from_redacted_parts(
+        ErrorCode::InvalidJobSpec,
+        "Saved job file is not valid",
+        format!("This saved job file could not be used: {reason}."),
+        Some("Re-export the job, or check that the file was not modified.".to_string()),
+        None,
+        new_technical_id(),
+    )
+}
+
+// ---------------------------------------------------------------------
 // JOB_CANCELLED
 // ---------------------------------------------------------------------
 
@@ -755,6 +837,35 @@ mod tests {
     fn job_cancelled_has_no_remediation() {
         let public = job_cancelled();
         assert_eq!(public.remediation(), None);
+    }
+
+    #[test]
+    fn directory_not_readable_io_never_leaks_raw_os_text_in_message() {
+        let err = some_io_error(std::io::ErrorKind::PermissionDenied);
+        let public = directory_not_readable_io(Path::new(r"C:\secret\folder"), &err);
+        assert!(!public.message().contains("very specific raw OS message"));
+        assert_eq!(public.code(), ErrorCode::InputNotReadable);
+        assert!(public.message().contains("permission denied"));
+    }
+
+    #[test]
+    fn export_destination_collision_names_both_paths() {
+        let public = export_destination_collision(
+            Path::new(r"C:\out\job.json"),
+            Path::new(r"C:\out\master-clean.pgn"),
+        );
+        assert_eq!(public.code(), ErrorCode::InputOutputCollision);
+        assert!(public.message().contains(r"C:\out\job.json"));
+        assert!(public.message().contains(r"C:\out\master-clean.pgn"));
+    }
+
+    #[test]
+    fn invalid_saved_manifest_includes_the_given_reason() {
+        let public = invalid_saved_manifest("unsupported job file version 999");
+        assert_eq!(public.code(), ErrorCode::InvalidJobSpec);
+        assert!(public
+            .message()
+            .contains("unsupported job file version 999"));
     }
 
     #[allow(deprecated)]

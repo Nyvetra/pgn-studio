@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! `validate_job` / `compile_job_preview` / `start_job` / `cancel_job` /
-//! `get_job` / `list_recent_jobs` / `delete_job_history` (design-02 §4.1).
+//! `get_job` / `list_recent_jobs` / `delete_job_history` /
+//! `export_job_manifest` (design-02 §4.1; architecture.md §13.7).
 //!
 //! Every handler here is a thin wrapper: deserialize (Tauri already did
 //! that), delegate to `application::jobs`, return. `start_job`
 //! additionally re-validates and re-compiles internally via `jobs::run_job`,
 //! since a `Ready` state from the UI is a convenience gate, never a trusted
 //! precondition (design-02 §2.1).
+
+use std::path::PathBuf;
 
 use uuid::Uuid;
 
@@ -74,4 +77,17 @@ pub async fn delete_job_history(
     job_id: Uuid,
 ) -> Result<(), PublicError> {
     jobs::delete_job_history(&state, job_id)
+}
+
+/// "Save Job" (architecture.md §13.7): exports a completed job's
+/// reproducible manifest to a user-chosen file via the native save dialog.
+/// `Ok(None)` means the user cancelled the dialog - not an error.
+#[tauri::command]
+#[specta::specta]
+pub async fn export_job_manifest(
+    app: AppHandle,
+    state: State<'_, AppContext>,
+    job_id: Uuid,
+) -> Result<Option<PathBuf>, PublicError> {
+    jobs::export_job_manifest(&app, &state, job_id).await
 }

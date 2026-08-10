@@ -10,16 +10,27 @@
 //! drive for long, never errors the whole call because one file is bad),
 //! not the authoritative, blocking validation pipeline `start_job`
 //! re-runs internally regardless of what this reported.
+//!
+//! Also owns `scan_input_directory` ("Add Folder", architecture.md §13.2):
+//! walks a user-picked folder (`filesystem::folder_scan`) and feeds the
+//! matched paths through this same [`inspect_inputs`], so the Files screen
+//! sees identical size/readability/warning data whether a file arrived via
+//! "Add Files" or "Add Folder" - see [`scan_input_directory`]'s own doc
+//! comment.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use specta::Type;
 use tokio::sync::Semaphore;
 
+use crate::domain::PublicError;
 use crate::errors;
+use crate::filesystem::folder_scan;
+
+use super::run_blocking;
 
 /// Design-02 §2.6, cited verbatim in this module's doc comment.
 const MAX_CONCURRENT_HASHERS: usize = 2;
@@ -70,6 +81,93 @@ pub async fn inspect_inputs(paths: Vec<String>, hash_inputs: bool) -> Vec<InputI
         }));
     }
     results
+}
+
+// ---------------------------------------------------------------------
+// scan_input_directory ("Add Folder", architecture.md §13.2)
+// ---------------------------------------------------------------------
+
+/// `scan_input_directory` request options - see
+/// `filesystem::folder_scan::ScanOptions` (the internal, non-IPC-facing
+/// twin this is converted into) for the full recursion-default rationale.
+/// A separate wire type rather than reusing that one directly for the same
+/// reason the rest of this codebase keeps `filesystem`/`engine` internals
+/// off the IPC boundary (design-02's "no wire type leaks an internal-only
+/// shape" convention - see `application::jobs::CommandPreviewDto`'s own
+/// doc comment for the identical reasoning applied to
+/// `engine::command_compiler::CompiledEngineCommand`).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ScanInputDirectoryOptions {
+    /// Whether to descend into subfolders. The frontend must default this
+    /// to `false` and surface it as an explicit "Include subfolders"
+    /// control - see `filesystem::folder_scan`'s module doc comment for why
+    /// non-recursive is the binding default.
+    pub recursive: bool,
+    /// The §11.2 "advanced override" for extensionless/non-`.pgn` files.
+    pub include_all_extensions: bool,
+}
+
+/// `scan_input_directory` response: the matched files, already run through
+/// the exact same [`inspect_inputs`] pipeline "Add Files" uses (so sizes,
+/// readability, and warnings are computed identically - never duplicated
+/// logic), plus enough truncation/scope metadata for the Files screen to
+/// show an honest "found N files..." review before anything is actually
+/// added (architecture.md §13.2).
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DirectoryScanDto {
+    pub files: Vec<InputInspectionDto>,
+    /// Echoes back what was actually used, so the UI can label the result
+    /// accurately ("12 files, including subfolders") without trusting its
+    /// own possibly-stale local state.
+    pub recursive: bool,
+    pub directories_scanned: u64,
+    pub truncated: bool,
+    pub truncation_notes: Vec<String>,
+}
+
+/// Scans `directory` for candidate `.pgn` inputs (architecture.md §13.2
+/// "Add Folder") and inspects every match through the same
+/// [`inspect_inputs`] path "Add Files" already uses, so the Files screen
+/// never sees two different notions of "size"/"readable"/"warnings" for
+/// the same file depending on how it was added.
+///
+/// The walk itself (`filesystem::folder_scan::scan_pgn_directory`) is
+/// synchronous/blocking, so it runs via [`run_blocking`]
+/// (architecture.md §19.4: filesystem scanning must not run on the
+/// async/UI-adjacent thread) - matching `application::jobs::validate_job`'s
+/// own precedent for wrapping a pure, synchronous `filesystem::` function.
+pub async fn scan_input_directory(
+    directory: String,
+    options: ScanInputDirectoryOptions,
+    hash_inputs: bool,
+) -> Result<DirectoryScanDto, PublicError> {
+    let root = PathBuf::from(&directory);
+    let root_for_error = root.clone();
+    let scan_options = folder_scan::ScanOptions {
+        recursive: options.recursive,
+        include_all_extensions: options.include_all_extensions,
+    };
+
+    let outcome = run_blocking(move || folder_scan::scan_pgn_directory(&root, &scan_options))
+        .await?
+        .map_err(|e| errors::directory_not_readable_io(&root_for_error, &e))?;
+
+    let paths: Vec<String> = outcome
+        .files
+        .into_iter()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect();
+    let files = inspect_inputs(paths, hash_inputs).await;
+
+    Ok(DirectoryScanDto {
+        files,
+        recursive: options.recursive,
+        directories_scanned: outcome.directories_visited,
+        truncated: outcome.truncated,
+        truncation_notes: outcome.truncation_notes,
+    })
 }
 
 async fn inspect_one(
@@ -216,5 +314,76 @@ mod tests {
         assert!(results[0].is_readable);
         assert!(!results[1].is_readable);
         assert!(results[2].is_readable);
+    }
+
+    fn scan_options(recursive: bool, include_all_extensions: bool) -> ScanInputDirectoryOptions {
+        ScanInputDirectoryOptions {
+            recursive,
+            include_all_extensions,
+        }
+    }
+
+    #[tokio::test]
+    async fn scan_input_directory_reuses_inspect_inputs_for_size_and_readability() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("a.pgn");
+        std::fs::write(&path, b"[Event \"x\"]\n\n1. e4 e5 1-0\n").unwrap();
+        let expected_len = std::fs::metadata(&path).unwrap().len();
+
+        let result = scan_input_directory(
+            tmp.path().to_string_lossy().into_owned(),
+            scan_options(false, false),
+            false,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.files.len(), 1);
+        assert!(result.files[0].is_readable);
+        assert_eq!(result.files[0].size_bytes, Some(expected_len));
+        assert!(!result.truncated);
+        assert!(!result.recursive);
+    }
+
+    #[tokio::test]
+    async fn scan_input_directory_echoes_the_recursive_flag_it_actually_used() {
+        let tmp = tempfile::tempdir().unwrap();
+        let sub = tmp.path().join("sub");
+        std::fs::create_dir(&sub).unwrap();
+        std::fs::write(sub.join("nested.pgn"), b"x").unwrap();
+
+        let non_recursive = scan_input_directory(
+            tmp.path().to_string_lossy().into_owned(),
+            scan_options(false, false),
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(non_recursive.files.len(), 0);
+        assert!(!non_recursive.recursive);
+
+        let recursive = scan_input_directory(
+            tmp.path().to_string_lossy().into_owned(),
+            scan_options(true, false),
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(recursive.files.len(), 1);
+        assert!(recursive.recursive);
+    }
+
+    #[tokio::test]
+    async fn scan_input_directory_on_a_missing_folder_is_a_reported_error_not_a_panic() {
+        let tmp = tempfile::tempdir().unwrap();
+        let missing = tmp.path().join("does-not-exist");
+        let err = scan_input_directory(
+            missing.to_string_lossy().into_owned(),
+            scan_options(false, false),
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.code(), crate::domain::ErrorCode::InputNotReadable);
     }
 }

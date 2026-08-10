@@ -55,6 +55,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             dialogs::reveal_path,
             dialogs::open_path,
             inputs::inspect_inputs,
+            inputs::scan_input_directory,
             jobs::validate_job,
             jobs::compile_job_preview,
             jobs::start_job,
@@ -62,6 +63,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             jobs::get_job,
             jobs::list_recent_jobs,
             jobs::delete_job_history,
+            jobs::export_job_manifest,
             settings::get_settings,
             settings::update_settings,
         ])

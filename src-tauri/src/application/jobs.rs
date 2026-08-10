@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! Job-lifecycle orchestration for the `commands::jobs` handlers
 //! (`validate_job`, `compile_job_preview`, `start_job`, `cancel_job`,
-//! `get_job`, `list_recent_jobs`, `delete_job_history` - design-02 §4.1).
+//! `get_job`, `list_recent_jobs`, `delete_job_history`, `export_job_manifest`
+//! - design-02 §4.1, architecture.md §13.7).
 //!
 //! This is the "business logic" `commands/` itself must not contain
 //! (`commands/README.md`): every function here composes the already-tested
@@ -14,6 +15,7 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 use specta::Type;
 use tauri::{AppHandle, Manager};
+use tauri_plugin_dialog::DialogExt;
 use uuid::Uuid;
 
 use crate::domain::{ArtifactKind, JobSpec, OutputArtifact, ProcessingMetrics, PublicError};
@@ -398,15 +400,26 @@ fn live_job_record(ctx: &AppContext, job_id: Uuid) -> Option<JobRecordDto> {
     })
 }
 
-async fn manifest_record(ctx: &AppContext, job_id: Uuid) -> Option<JobRecordDto> {
+/// Reads and parses `<jobs_root>/<job_id>/manifest.json` if present, `None`
+/// otherwise (unknown id, job never reached a terminal state, or the
+/// workspace was already evicted by history retention - see
+/// [`record_history`]). Shared by [`manifest_record`] (the `get_job`
+/// fallback) and [`export_job_manifest`] ("Save Job", architecture.md
+/// §13.7) so both read the exact same on-disk record rather than two
+/// slightly different reimplementations.
+async fn read_final_manifest(ctx: &AppContext, job_id: Uuid) -> Option<FinalManifest> {
     let manifest_path = workspace_root_for(&ctx.jobs_root, job_id).join("manifest.json");
-    let manifest: FinalManifest = run_blocking(move || {
+    run_blocking(move || {
         let raw = std::fs::read_to_string(&manifest_path).ok()?;
         serde_json::from_str::<FinalManifest>(&raw).ok()
     })
     .await
     .ok()
-    .flatten()?;
+    .flatten()
+}
+
+async fn manifest_record(ctx: &AppContext, job_id: Uuid) -> Option<JobRecordDto> {
+    let manifest = read_final_manifest(ctx, job_id).await?;
 
     let elapsed_ms = (manifest.finished_at - manifest.started_at)
         .num_milliseconds()
@@ -489,4 +502,77 @@ pub fn delete_job_history(ctx: &AppContext, job_id: Uuid) -> Result<(), PublicEr
         ));
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------------
+// export_job_manifest ("Save Job", architecture.md §13.7)
+// ---------------------------------------------------------------------
+
+/// "Save Job" (architecture.md §13.7, §4.4, §15.3): exports a completed
+/// job's full reproducible manifest - schema version, app/engine identity,
+/// inputs, options, sanitized argv, criteria-file hashes, timestamps,
+/// artifacts, metrics, warnings/error (§15.3's complete checklist, already
+/// exactly what [`FinalManifest`] carries - see that type's own doc
+/// comment) - to a user-chosen file via the native save dialog. Returns the
+/// chosen path, or `None` if the user cancelled the dialog.
+///
+/// The dialog is called directly here rather than from `commands::dialogs`
+/// because, unlike that module's pure pickers, this handler is
+/// fundamentally a *job* operation (it reads the job's own manifest and
+/// validates the destination against the job's own paths) - keeping it
+/// alongside the other `commands::jobs` handlers matches how [`get_job`]
+/// already reads this exact manifest file.
+///
+/// The destination is validated in Rust exactly like any other output path
+/// (`filesystem::export::validate_export_destination` - parent-directory
+/// writability, reserved device names, and non-aliasing against this job's
+/// own input/artifact paths) before anything is written; the frontend never
+/// writes files directly (architecture.md §16.2).
+pub async fn export_job_manifest(
+    app: &AppHandle,
+    ctx: &AppContext,
+    job_id: Uuid,
+) -> Result<Option<PathBuf>, PublicError> {
+    let manifest = read_final_manifest(ctx, job_id).await.ok_or_else(|| {
+        errors::invalid_job_spec("jobId", "no completed job manifest was found for this id")
+    })?;
+
+    // `blocking_save_file` is the dialog plugin's own documented pattern
+    // for an `async fn` Tauri command - it blocks a tokio worker thread,
+    // never the main/UI thread (see `commands::dialogs`'s module doc
+    // comment for the identical reasoning already established for
+    // `blocking_pick_files`/`blocking_pick_folder`).
+    let suggested_name = format!("{}.pgnstudio-job.json", manifest.spec.output.base_name);
+    let picked = app
+        .dialog()
+        .file()
+        .add_filter("PGN Studio job", &["json"])
+        .set_file_name(&suggested_name)
+        .blocking_save_file();
+    let Some(destination) = picked.and_then(|fp| fp.simplified().into_path().ok()) else {
+        return Ok(None); // user cancelled the dialog
+    };
+
+    let mut protected: Vec<PathBuf> = manifest
+        .spec
+        .inputs
+        .iter()
+        .map(|i| i.path.clone())
+        .collect();
+    protected.extend(manifest.artifacts.iter().map(|a| a.path.clone()));
+    crate::filesystem::export::validate_export_destination(&destination, &protected)?;
+
+    let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| {
+        #[allow(deprecated)]
+        errors::unknown_internal_error(anyhow::anyhow!("serializing job manifest for export: {e}"))
+    })?;
+
+    let destination_for_write = destination.clone();
+    run_blocking(move || {
+        crate::filesystem::export::write_export_file_atomically(&destination_for_write, &bytes)
+    })
+    .await?
+    .map_err(|e| errors::output_not_writable_io(&destination, &e))?;
+
+    Ok(Some(destination))
 }
