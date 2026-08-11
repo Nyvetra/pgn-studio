@@ -70,13 +70,21 @@ impl SidecarLocation {
     }
 }
 
-/// The one target this project currently ships (DECISIONS-LEDGER.md D-006:
-/// macOS is out of scope, no Mac available; only
-/// `x86_64-pc-windows-msvc` is built and verified). Matches
-/// `engine::capability`'s existing single-target precedent exactly -
-/// extending to another target is a small, explicit, future change here,
-/// not a guess made now.
-const TARGET_TRIPLE: &str = "x86_64-pc-windows-msvc";
+/// Re-exported from [`crate::engine::capability`] rather than restated, so
+/// the triple this crate ships for is written in exactly one place. That
+/// module has to know it anyway (it selects which `build-info-<triple>.json`
+/// to embed), and a second copy here could silently disagree with the
+/// binary actually on disk.
+use crate::engine::capability::TARGET_TRIPLE;
+
+/// `".exe"` on Windows, `""` everywhere else. `std::env::consts` resolves
+/// against the *compilation target*, which is exactly the question being
+/// asked: `scripts/build-pgn-extract.ps1` installs
+/// `pgn-extract-<triple>.exe` while `scripts/build-pgn-extract.sh` installs
+/// `pgn-extract-<triple>` with no extension, and Tauri's own
+/// `external_binaries` helper applies the same rule when it stages the
+/// bundled copy.
+const EXE_SUFFIX: &str = std::env::consts::EXE_SUFFIX;
 
 /// The expected sidecar path for a given location - pure path arithmetic,
 /// no filesystem access, so it can be asserted against in tests without
@@ -84,9 +92,11 @@ const TARGET_TRIPLE: &str = "x86_64-pc-windows-msvc";
 pub fn expected_sidecar_path(location: &SidecarLocation) -> PathBuf {
     match location {
         SidecarLocation::Dev { binaries_dir } => {
-            binaries_dir.join(format!("pgn-extract-{TARGET_TRIPLE}.exe"))
+            binaries_dir.join(format!("pgn-extract-{TARGET_TRIPLE}{EXE_SUFFIX}"))
         }
-        SidecarLocation::Bundled { resource_dir } => resource_dir.join("pgn-extract.exe"),
+        SidecarLocation::Bundled { resource_dir } => {
+            resource_dir.join(format!("pgn-extract{EXE_SUFFIX}"))
+        }
     }
 }
 
@@ -319,7 +329,13 @@ mod tests {
     fn expected_sidecar_path_dev_matches_the_real_binaries_directory() {
         let location = SidecarLocation::dev_default();
         let path = expected_sidecar_path(&location);
-        assert!(path.ends_with("binaries\\pgn-extract-x86_64-pc-windows-msvc.exe"));
+        // Built from Path components, not a literal with an embedded
+        // separator: `Path::ends_with` matches whole components, so a
+        // hardcoded "binaries\\..." can never match on a platform whose
+        // separator is `/`.
+        assert!(path.ends_with(
+            Path::new("binaries").join(format!("pgn-extract-{TARGET_TRIPLE}{EXE_SUFFIX}"))
+        ));
         assert!(
             path.is_file(),
             "dev_default() must resolve to the real committed sidecar at {path:?}"
@@ -328,14 +344,20 @@ mod tests {
 
     #[test]
     fn expected_sidecar_path_bundled_strips_the_target_triple() {
+        // An absolute path with a space in it, spelled per-platform: the
+        // point of the fixture is "a realistic install directory", and on
+        // macOS `C:\...` is a *relative* single-component path, which would
+        // quietly stop testing what this asserts.
+        #[cfg(windows)]
+        let resource_dir = PathBuf::from(r"C:\Program Files\PGN Studio");
+        #[cfg(not(windows))]
+        let resource_dir = PathBuf::from("/Applications/PGN Studio.app/Contents/Resources");
+
         let location = SidecarLocation::Bundled {
-            resource_dir: PathBuf::from(r"C:\Program Files\PGN Studio"),
+            resource_dir: resource_dir.clone(),
         };
         let path = expected_sidecar_path(&location);
-        assert_eq!(
-            path,
-            PathBuf::from(r"C:\Program Files\PGN Studio\pgn-extract.exe")
-        );
+        assert_eq!(path, resource_dir.join(format!("pgn-extract{EXE_SUFFIX}")));
     }
 
     #[tokio::test]
@@ -367,7 +389,12 @@ mod tests {
         // naive check might special-case, but well within the binary.
         let flip_at = bytes.len() / 2;
         bytes[flip_at] ^= 0xFF;
-        let tampered_path = tmp.path().join("pgn-extract-x86_64-pc-windows-msvc.exe");
+        // Must match what expected_sidecar_path() will look for in this
+        // temp Dev location, or the test asserts ENGINE_MISSING instead of
+        // the ENGINE_TAMPERED it is actually about.
+        let tampered_path = tmp
+            .path()
+            .join(format!("pgn-extract-{TARGET_TRIPLE}{EXE_SUFFIX}"));
         std::fs::write(&tampered_path, &bytes).unwrap();
 
         let location = SidecarLocation::Dev {
