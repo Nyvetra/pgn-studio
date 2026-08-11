@@ -48,12 +48,23 @@
 # upstream test-suite layer, never to build the engine
 # (scripts/build-pgn-extract.ps1 uses MSVC via vswhere and nothing else).
 #
-# Known macOS limitation (decisions ledger D-006): the `include_str!` in
-# (2) hardcodes the *Windows* build-info filename, and
-# engine::sidecar's tests assert a Windows `binaries\...exe` path, so the
-# crate cannot compile on macOS at all yet - no sidecar build is attempted
-# there, and those jobs stay `continue-on-error` until a macOS build-info
-# plus `cfg!`-based selection exists.
+# macOS status (decisions ledger D-006). The `include_str!` in (2) used to
+# hardcode the *Windows* build-info filename, so the crate could not compile
+# on macOS at all and no sidecar was built there. capability.rs now selects
+# `build-info-<triple>.json` by cfg over the three triples in
+# engine-src/upstream.lock, and engine::sidecar derives the sidecar filename
+# from that same triple plus `std::env::consts::EXE_SUFFIX` - so these legs
+# now build the sidecar and genuinely compile the crate.
+#
+# They are still `continue-on-error`, and are expected to FAIL at `cargo
+# test` rather than at compilation, because a second, unrelated class of
+# Windows assumption lives in the test fixtures: `command_compiler`'s
+# `validate_structural` rejects non-absolute paths, and the golden/compiler
+# fixtures use `r"C:\in\a.pgn"` - a *relative* single-component path on
+# macOS - while several expectations hardcode `\` separators that
+# `PathBuf::join` never produces there. Porting those fixtures is a
+# separate, mechanical change; until it lands, read a red macOS leg here as
+# "test fixtures are Windows-shaped", not "the engine is broken on macOS".
 name: Rust
 
 on:
@@ -113,6 +124,20 @@ jobs:
         shell: pwsh
         working-directory: ${{ github.workspace }}
         run: ./scripts/build-pgn-extract.ps1
+
+      # New: the macOS legs used to skip this, because engine::capability
+      # embedded the Windows build-info unconditionally and the crate could
+      # not compile on macOS at all, so building a sidecar there bought
+      # nothing. That is no longer true - capability.rs now selects
+      # build-info-<triple>.json by cfg - so these legs need the sidecar for
+      # exactly the same three reasons the Windows leg does (see header).
+      # `working-directory` override for the same reason as above:
+      # defaults.run.working-directory is src-tauri, and the script lives at
+      # the repo root.
+      - name: Build the pinned pgn-extract sidecar (macOS)
+        if: runner.os == 'macOS'
+        working-directory: ${{ github.workspace }}
+        run: ./scripts/build-pgn-extract.sh
 
       - name: Lint (Clippy, warnings denied)
         run: cargo clippy --all-targets -- -D warnings

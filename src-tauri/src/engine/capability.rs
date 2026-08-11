@@ -11,20 +11,67 @@
 use crate::domain::{EngineCapabilities, EngineIdentity, OutputNotation};
 use serde::Deserialize;
 
-/// The build-info JSON the engine-build workstream writes for the pinned
-/// Windows sidecar (`scripts/build-pgn-extract.ps1`). Embedded at *compile*
-/// time via `include_str!` rather than copied by hand into a string
-/// literal, specifically so this module can never drift from the actual
-/// pinned binary's verified identity (DECISIONS-LEDGER.md's repeated
-/// "never invent, never placeholder" rule for pin values) — if that
-/// workstream re-pins the binary, this map picks up the new identity on the
-/// next build with no manual edit required here.
+/// Defines, for one target triple, the three things that must agree about
+/// it: the triple string itself, the `build-info-<triple>.json` embedded at
+/// *compile* time, and the panic message naming that file.
 ///
-/// Only the Windows x86_64 build exists at the time of this task
-/// (DECISIONS-LEDGER.md D-006: macOS is out of scope, no Mac available).
-/// A future macOS build would need its own `build-info-*.json` and this
-/// function would need to select by `cfg!(target_os = ..)` / target triple.
-const BUILD_INFO_JSON: &str = include_str!("../../binaries/build-info-x86_64-pc-windows-msvc.json");
+/// Embedding via `include_str!` rather than a hand-copied string literal is
+/// what stops this module drifting from the actual pinned binary's verified
+/// identity (DECISIONS-LEDGER.md's "never invent, never placeholder" rule
+/// for pin values) - re-pin the engine and this map picks the new identity
+/// up on the next build with no edit here.
+///
+/// A macro rather than three `#[cfg]`-attributed `const` lines because
+/// `include_str!` requires a *literal* path, so the triple cannot be
+/// selected at runtime and would otherwise have to be spelled out three
+/// times per arm. `include_str!(concat!(..))` is fine: `concat!` expands to
+/// a literal before `include_str!` sees it.
+macro_rules! pinned_target {
+    ($triple:literal) => {
+        /// The target triple this crate is compiled for, and whose sidecar
+        /// and `build-info-<triple>.json` it embeds. Shared with
+        /// [`crate::engine::sidecar`] so the triple is stated once.
+        pub(crate) const TARGET_TRIPLE: &str = $triple;
+
+        const BUILD_INFO_JSON: &str =
+            include_str!(concat!("../../binaries/build-info-", $triple, ".json"));
+
+        const BUILD_INFO_PARSE_ERROR: &str = concat!(
+            "src-tauri/binaries/build-info-",
+            $triple,
+            ".json must be valid JSON with triple/sha256/engineVersion string fields \
+             — if the engine-build tooling changed this file's shape, update BuildInfo to match"
+        );
+    };
+}
+
+// Gated on target_os AND target_arch: `target_arch = "x86_64"` alone
+// matches both Windows and Intel macOS. These are exactly the three
+// toolchains engine-src/upstream.lock declares and the two build scripts
+// know how to produce.
+#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+pinned_target!("x86_64-pc-windows-msvc");
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+pinned_target!("aarch64-apple-darwin");
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+pinned_target!("x86_64-apple-darwin");
+
+// Without this arm an unsupported target fails with a bare "cannot find
+// value `BUILD_INFO_JSON`", which says nothing about what is actually
+// missing. Adding a target means adding an upstream.lock toolchain entry
+// and a build-script branch too, not just a cfg arm here.
+#[cfg(not(any(
+    all(target_os = "windows", target_arch = "x86_64"),
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "macos", target_arch = "x86_64"),
+)))]
+compile_error!(
+    "PGN Studio builds a pgn-extract sidecar only for the three triples in \
+     engine-src/upstream.lock's `toolchains` map: x86_64-pc-windows-msvc, \
+     aarch64-apple-darwin, x86_64-apple-darwin. Add a lock toolchain entry, a \
+     scripts/build-pgn-extract.* branch, and a cfg arm in \
+     src-tauri/src/engine/capability.rs before building for another target."
+);
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,11 +82,7 @@ struct BuildInfo {
 }
 
 fn pinned_identity() -> EngineIdentity {
-    let info: BuildInfo = serde_json::from_str(BUILD_INFO_JSON).expect(
-        "src-tauri/binaries/build-info-x86_64-pc-windows-msvc.json must be valid JSON \
-         with triple/sha256/engineVersion string fields — if the engine-build tooling \
-         changed this file's shape, update BuildInfo to match",
-    );
+    let info: BuildInfo = serde_json::from_str(BUILD_INFO_JSON).expect(BUILD_INFO_PARSE_ERROR);
     EngineIdentity {
         version: info.engine_version,
         sha256: info.sha256,
@@ -126,7 +169,13 @@ mod tests {
     fn identity_matches_the_pinned_build_info_file() {
         let caps = pinned_v26_06();
         assert_eq!(caps.identity.version, "v26-06");
-        assert_eq!(caps.identity.target_triple, "x86_64-pc-windows-msvc");
+        // Against TARGET_TRIPLE, not a Windows literal: this asserts the
+        // *agreement* between the embedded build-info and the triple this
+        // crate was compiled for, which is the property that matters and
+        // the one that would catch a mismatched sidecar. A hardcoded
+        // literal would simply fail on macOS while proving nothing extra
+        // on Windows.
+        assert_eq!(caps.identity.target_triple, TARGET_TRIPLE);
         assert_eq!(
             caps.identity.sha256.len(),
             64,
