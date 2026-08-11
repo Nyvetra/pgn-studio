@@ -209,25 +209,42 @@ Three of the four bullets above are superseded. Established by workflow run
   uploaded as an artifact. "Builds and packages" is not "runs correctly",
   and no Mac is available here to check. Treat the first real launch as
   verification, exactly as D-006 said to treat the first real build.
-- **DMG packaging on `macos-15-intel` is intermittent.** In run
-  31533789885 the release binary compiled and `PGN Studio.app` bundled,
-  and the run then failed in `bundle_dmg.sh` producing
-  `PGN Studio_0.1.0_x64.dmg` — a *packaging* failure, not a build
-  failure. In run 31535290496 the identical step succeeded and produced
-  the Intel bundle. `macos-14` packaged fine in both.
+- **DMG packaging on `macos-15-intel` is intermittent — demonstrated, not
+  inferred.** In run **31533789885 attempt 1** the release binary
+  compiled and `PGN Studio.app` bundled, and the run then failed in
+  `bundle_dmg.sh` producing `PGN Studio_0.1.0_x64.dmg` — a *packaging*
+  failure, not a build failure. That same job was then re-run with **no
+  change of any kind**, and **attempt 2 of the same run, on the same
+  commit `c43133d`, succeeded** and produced the Intel bundle. Identical
+  inputs, opposite outcomes: that is what rules out a code defect here,
+  and it is stronger evidence than the two same-step-different-commit
+  observations that follow it (runs 31535290496 and 31536632395, both
+  green). `macos-14` packaged fine throughout.
 
-  That pattern matches a documented GitHub Actions runner-image problem
+  **Cite the attempt, not just the run.** A GitHub re-run *replaces* the
+  failed attempt, so run 31533789885 today reports `completed/success`
+  with all three jobs green at attempt 2. Following that run ID expecting
+  to find the failure will show a fully green run and make this entry look
+  wrong. The failure exists only in attempt 1's logs.
+
+  The behaviour matches a documented GitHub Actions runner-image problem
   rather than anything in this project: `hdiutil` intermittently fails
   DMG creation with "Resource busy"
   ([actions/runner-images#7522](https://github.com/actions/runner-images/issues/7522),
   and repeatedly against Tauri, e.g.
   [tauri-action#801](https://github.com/tauri-apps/tauri-action/issues/801)).
-  The failing run's cleanup reported an orphaned `diskimages-helper`,
-  which is `hdiutil` still holding the image. Expect this leg to fail
-  occasionally; a red DMG step is not by itself evidence of a defect
-  here. Note also that Tauri swallows `bundle_dmg.sh`'s output unless
-  `--verbose` is passed, so such a failure currently logs no cause at
-  all.
+  Attempt 1's cleanup reported an orphaned `diskimages-helper`, which is
+  `hdiutil` still holding the image. Expect this leg to fail occasionally;
+  a red DMG step is not by itself evidence of a defect here — re-run it
+  before investigating.
+
+  Since `534dd6f` the macOS bundle step retries up to three times and
+  passes `--verbose`, so `bundle_dmg.sh`'s own output now reaches the log.
+  Before that Tauri swallowed it entirely and a failure logged no cause at
+  all, which is why attempt 1's cause had to be inferred from a process
+  name in the runner's cleanup output. Three consecutive failures are
+  therefore no longer explainable as this flake, and should be read as a
+  real regression.
 - **macOS reproducibility is still unmeasured.** Unchanged from the first
   amendment: no two-build comparison has been run there.
 - **Both original constraints stand entirely unchanged.** Still no Mac

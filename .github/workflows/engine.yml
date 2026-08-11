@@ -24,9 +24,9 @@
 # Expect macos-15-intel to fail intermittently in bundle_dmg.sh: `hdiutil`
 # fails DMG creation with "Resource busy" now and then on GitHub's macOS
 # runners (actions/runner-images#7522), which is a runner-image problem,
-# not one of ours - the .app bundles fine and only the .dmg step trips. It
-# has been observed failing once and succeeding once from otherwise
-# equivalent commits. Re-run the job before investigating.
+# not one of ours - the .app bundles fine and only the .dmg step trips.
+# Demonstrated, not guessed: the failing job was re-run with no change and
+# passed on the same commit. Re-run before investigating.
 #
 # Both legs stay marked `unverified: true` (continue-on-error) and named
 # accordingly, and that is not vestigial: nobody has ever *launched* the
@@ -144,12 +144,16 @@ jobs:
       #
       # Windows builds once. macOS retries, because `hdiutil` intermittently
       # fails DMG creation with 'Resource busy' on GitHub's macOS runners
-      # (actions/runner-images#7522) - observed here failing on
-      # macos-15-intel in run 31533789885 and succeeding on the identical
-      # step in 31535290496, with the failing run's cleanup reporting an
-      # orphaned `diskimages-helper`, i.e. hdiutil still holding the image.
-      # Windows has no equivalent failure mode, so it is deliberately left
-      # as a single attempt rather than given a retry it does not need.
+      # (actions/runner-images#7522). This retry is justified by a direct
+      # demonstration rather than a hunch: macos-15-intel failed here in run
+      # 31533789885 ATTEMPT 1, and attempt 2 of that same run - re-run with
+      # no change, same commit c43133d - passed. Attempt 1's cleanup
+      # reported an orphaned `diskimages-helper`, i.e. hdiutil still holding
+      # the image. (Cite the attempt: a re-run replaces the failed one, so
+      # that run now reads success and only attempt 1's logs show the
+      # failure.) Windows has no equivalent failure mode, so it is
+      # deliberately left as a single attempt rather than given a retry it
+      # does not need.
       - name: Build the Tauri application bundle (Windows)
         if: runner.os == 'Windows'
         run: npm run tauri build
