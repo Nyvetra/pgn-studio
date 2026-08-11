@@ -7,11 +7,12 @@
 //! settings/history - producing the single [`AppContext`] Tauri manages for
 //! the rest of the app's life.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, Manager, Runtime};
 
 use crate::engine::sidecar::{self, SidecarLocation};
+use crate::filesystem::eco_merge;
 use crate::persistence::history::JsonHistoryStore;
 use crate::persistence::settings::JsonSettingsStore;
 
@@ -24,19 +25,60 @@ use super::context::{AppContext, EngineBundle};
 /// dir at install time.
 const ECO_FILE_RELATIVE_PATH: &str = "resources/pgn-extract/eco.pgn";
 
-fn resolve_eco_file<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
+/// PGN Studio's own generated supplement (`scripts/build-eco-supplement.mjs`),
+/// bundled next to the third-party `eco.pgn` but deliberately in its own
+/// directory so the two datasets never look like one file - see
+/// `filesystem::eco_merge` and `resources/eco-supplement/SOURCE.json`.
+const ECO_SUPPLEMENT_RELATIVE_PATH: &str = "resources/eco-supplement/eco-supplement.pgn";
+
+/// Resolves a bundled resource under both the dev tree and the installed
+/// resource directory. Mirrors `engine::sidecar::SidecarLocation::dev_default`'s
+/// own pattern exactly: in debug builds resolve relative to *this crate's*
+/// manifest directory at compile time, correct regardless of the process's
+/// current working directory under `cargo tauri dev`/`cargo test`.
+///
+/// `tauri.conf.json`'s `bundle.resources` list (plain string entries, not
+/// the `{ src, target }` remapping form) preserves each relative path
+/// verbatim under the resource dir at install time.
+fn resolve_resource<R: Runtime>(app: &AppHandle<R>, relative: &str) -> PathBuf {
     if cfg!(debug_assertions) {
-        // Mirrors `engine::sidecar::SidecarLocation::dev_default`'s own
-        // pattern exactly: resolve relative to *this crate's* manifest
-        // directory at compile time, correct regardless of the process's
-        // current working directory under `cargo tauri dev`/`cargo test`.
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(ECO_FILE_RELATIVE_PATH)
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative)
     } else {
         app.path()
             .resource_dir()
-            .map(|dir| dir.join(ECO_FILE_RELATIVE_PATH))
-            .unwrap_or_else(|_| PathBuf::from(ECO_FILE_RELATIVE_PATH))
+            .map(|dir| dir.join(relative))
+            .unwrap_or_else(|_| PathBuf::from(relative))
     }
+}
+
+/// Resolves the ECO file the engine's `-e` option will be given: the
+/// bundled `eco.pgn` concatenated with PGN Studio's supplement, cached
+/// under `<app-cache>/eco/`.
+///
+/// Degrades to the bundled `eco.pgn` alone if the supplement is missing or
+/// the merge fails, so ECO classification can never be *worse* than it was
+/// before the supplement existed. See `filesystem::eco_merge` for why a
+/// merged file (rather than two `-e` flags) is the only option.
+fn resolve_eco_file<R: Runtime>(app: &AppHandle<R>, cache_root: &Path) -> PathBuf {
+    let bundled = resolve_resource(app, ECO_FILE_RELATIVE_PATH);
+    let supplement = resolve_resource(app, ECO_SUPPLEMENT_RELATIVE_PATH);
+
+    let choice = eco_merge::resolve_eco_file(&bundled, &supplement, cache_root);
+    if choice.merged {
+        tracing::info!(
+            component = "application::startup",
+            path = %choice.path.display(),
+            "using the merged ECO classification file"
+        );
+    } else {
+        tracing::warn!(
+            component = "application::startup",
+            path = %choice.path.display(),
+            reason = choice.note.as_deref().unwrap_or("unknown"),
+            "falling back to the bundled eco.pgn without the supplement"
+        );
+    }
+    choice.path
 }
 
 fn sidecar_location<R: Runtime>(app: &AppHandle<R>) -> SidecarLocation {
@@ -69,11 +111,16 @@ pub async fn initialize<R: Runtime>(app: &AppHandle<R>) -> AppContext {
         Err(e) => Err(e),
     };
 
-    let jobs_root = app
-        .path()
-        .app_cache_dir()
+    // Resolved once and shared: `jobs_root` keeps its original fallback
+    // path verbatim (a leftover workspace from a previous crash must stay
+    // findable at the exact location the sweep has always looked), while
+    // the merged ECO file gets a sibling directory under the same root.
+    let cache_dir = app.path().app_cache_dir().ok();
+    let jobs_root = cache_dir
+        .clone()
         .map(|dir| dir.join("jobs"))
-        .unwrap_or_else(|_| std::env::temp_dir().join("pgn-studio-jobs"));
+        .unwrap_or_else(|| std::env::temp_dir().join("pgn-studio-jobs"));
+    let eco_cache_root = cache_dir.unwrap_or_else(|| std::env::temp_dir().join("pgn-studio-cache"));
     // Design-02 §3.3: sweep exactly once, before any job can start, so a
     // leftover temp file from a killed process is never mistaken for a
     // fresh job's output. Best-effort: a sweep failure (e.g. an unreadable
@@ -91,7 +138,7 @@ pub async fn initialize<R: Runtime>(app: &AppHandle<R>) -> AppContext {
         _ => {}
     }
 
-    let eco_file = resolve_eco_file(app);
+    let eco_file = resolve_eco_file(app, &eco_cache_root);
 
     let config_dir = app
         .path()

@@ -47,6 +47,8 @@
       "resources/pgn-extract/COPYING",
       "resources/pgn-extract/SOURCE.json",
       "resources/pgn-extract/eco.pgn",
+      "resources/eco-supplement/eco-supplement.pgn",
+      "resources/eco-supplement/SOURCE.json",
       "resources/licenses/**/*"
     ],
     "externalBin": ["binaries/pgn-extract"]
