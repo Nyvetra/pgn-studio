@@ -61,18 +61,21 @@
       "reproducibility": "/Brepro (cl.exe on engineFlags+treFlags, lib.exe+link.exe on linkFlags) makes the installed pgn-extract-x86_64-pc-windows-msvc.exe byte-for-byte identical across clean rebuilds of the same pinned commit ON THE SAME MSVC TOOLSET, INCLUDING neutralizing argsfile.c's `__DATE__` use (help banner) to a fixed placeholder instead of the real compile date. It removes TIME as a build input, not TOOLCHAIN VERSION: this lock pins the engine sources and flags but NOT cl.exe/link.exe themselves, and MSVC 19.44, MSVC 19.51.36252 (GitHub Actions windows-latest) and a third machine's toolset have each been measured producing a different binary (426496 / 427520 / 427008 bytes). That is expected, and nothing depends on cross-toolset equality - src-tauri/binaries/checksums.json is written by the same build that produced the binary, so no externally-pinned hash exists anywhere in the build/verify/startup path. See engine-src/README.md 'Reproducibility', and its 'What /Brepro does not fix' subsection, for full evidence and how to re-verify."
     },
     "aarch64-apple-darwin": {
-      "compiler": "Apple clang (recorded at build time by scripts/build-pgn-extract.sh)",
+      "compiler": "Apple clang (recorded at build time by scripts/build-pgn-extract.sh); observed on CI: Apple clang version 15.0.0 (clang-1500.3.9.4)",
       "engineFlags": ["-std=c99", "-O3", "-D__DATE__=\"1\"", "-D__TIME__=\"1\"", "-Wno-builtin-macro-redefined"],
       "linkFlags": ["-Wl,-no_uuid"],
-      "verified": false,
-      "note": "Written but UNVERIFIED - no Mac available to this build (decisions ledger D-006). The -D__DATE__/-D__TIME__/-Wno-builtin-macro-redefined and -Wl,-no_uuid flags mirror the Windows /Brepro reproducibility fix (engine-src/README.md 'Reproducibility') but are themselves UNVERIFIED on real Apple clang - treat their first real run as verification, not a formality (same standing caveat as the rest of this toolchain entry)."
+      "verified": "builds",
+      "firstRealRun": "GitHub Actions macos-14, 2026-08-11, workflow run 31497585623",
+      "observedArtifact": { "sizeBytes": 214680, "sha256": "83c4eae6be8066868e08d40859ecda384563b60914d628744d7f098b1e63867d" },
+      "note": "No Mac is available to this development environment (decisions ledger D-006), but this toolchain entry has now actually been exercised on CI and it BUILDS: Apple clang compiles and links the pinned commit, the --version smoke check passes, the sidecar installs, and scripts/verify-engine.ps1 then passes Layer 0 (pin provenance), Layer 1 (identity) and Layer 2 (76/76 of pgn-extract's own upstream test suite) against it. 'verified' is the string \"builds\", NOT true, because two things are still unproven: (1) the -D__DATE__/-D__TIME__/-Wno-builtin-macro-redefined and -Wl,-no_uuid flags mirror the Windows /Brepro reproducibility fix but their EFFECT has never been measured on macOS - no two-build comparison has been run - so treat macOS reproducibility as unverified; (2) verify-engine.ps1 Layer 3 fails 0/6 on macOS, which is a fixture line-ending artifact and not an engine defect (the six outputs are content-identical to the goldens; only CRLF vs LF differs - see engine-src/README.md's macOS section)."
     },
     "x86_64-apple-darwin": {
       "compiler": "Apple clang (recorded at build time by scripts/build-pgn-extract.sh)",
       "engineFlags": ["-std=c99", "-O3", "-D__DATE__=\"1\"", "-D__TIME__=\"1\"", "-Wno-builtin-macro-redefined"],
       "linkFlags": ["-Wl,-no_uuid"],
-      "verified": false,
-      "note": "Written but UNVERIFIED - no Mac available to this build (decisions ledger D-006). The -D__DATE__/-D__TIME__/-Wno-builtin-macro-redefined and -Wl,-no_uuid flags mirror the Windows /Brepro reproducibility fix (engine-src/README.md 'Reproducibility') but are themselves UNVERIFIED on real Apple clang - treat their first real run as verification, not a formality (same standing caveat as the rest of this toolchain entry)."
+      "verified": "builds",
+      "firstRealRun": "GitHub Actions macos-15-intel, 2026-08-11, workflow run 31497585623",
+      "note": "Same standing as the aarch64-apple-darwin entry above, and verified to the same depth: the macos-15-intel CI leg builds, smoke-checks and installs the sidecar successfully. Its per-artifact size/sha256 are deliberately not recorded here - they were not captured from that run, and inventing them would violate this file's never-placeholder rule. The same two caveats apply: reproducibility flags unmeasured on macOS, and verify-engine.ps1 Layer 3's 0/6 is a fixture line-ending artifact rather than an engine defect."
     }
   },
   "lastVerified": "2026-08-07"

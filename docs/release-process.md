@@ -4,7 +4,10 @@ This document describes how a PGN Studio release is meant to be built and
 verified, and — as honestly as possible — which parts of that process have
 actually been executed and verified versus which parts are written but
 unverified because the hardware to verify them does not exist in this
-project's development environment. Overstating verification here would
+project's development environment. (Some of that gap has since been
+closed by CI runners rather than by local hardware — where it has, the
+sections below say so specifically, and say what is still open.)
+Overstating verification here would
 defeat the entire point of the document, so read the "not verifiable from
 this machine" section as binding, not as boilerplate.
 
@@ -81,19 +84,33 @@ This project has been developed entirely on Windows, with no Mac
 available at any point. The following are honest, structural gaps, not
 oversights waiting to be filled in casually:
 
-- **macOS builds are unverified.** `scripts/build-pgn-extract.sh` is
-  written to mirror the Windows script's contract (fetch the same pin,
-  compile with Apple clang and the system libc regex implementation — no
-  TRE on macOS) but has never actually been run. Its first real execution
-  should be treated as its first real test, not a formality.
+- **The macOS engine builds; the macOS product does not exist yet.**
+  `scripts/build-pgn-extract.sh` mirrors the Windows script's contract
+  (fetch the same pin, compile with Apple clang and the system libc regex
+  implementation — no TRE on macOS), and it has now actually been run on
+  GitHub Actions `macos-14` and `macos-15-intel`. It works: both build,
+  smoke-check and install a real sidecar, and `verify-engine.ps1` passes
+  Layers 0–2 against it, including 76/76 of pgn-extract's own upstream
+  test suite. That first run also found two real defects (a missing
+  executable bit and a stdout-only `--version` capture), which is exactly
+  why it was worth running rather than assuming.
+
+  What that does **not** mean: macOS reproducibility is still unmeasured
+  (the `-D__DATE__`/`-Wl,-no_uuid` flags have never been checked for
+  effect), `verify-engine.ps1` Layer 3 still reports 0/6 there for
+  line-ending reasons documented in `engine-src/README.md`, the Rust
+  crate does not compile on macOS at all yet (`engine::capability`
+  hardcodes the Windows build-info), and consequently **no macOS
+  application bundle has ever been produced.** Do not ship a macOS
+  release on the strength of a working sidecar.
 - **macOS code signing and notarization cannot be done here.** Both
   require an Apple Developer ID Application certificate and access to
   Apple's notarization service — neither is available in this environment.
-  The macOS CI jobs that exist are real, executable workflow definitions,
-  but are explicitly marked `unverified: true` (with `continue-on-error`)
-  and labeled as unverified in their own job names. Nothing about their
-  presence in this repository should be read as "macOS support has been
-  tested" — it has not.
+  The macOS CI jobs are real, executable workflow definitions and now
+  genuinely execute, but they remain marked `unverified: true` (with
+  `continue-on-error`) and labeled as unverified in their own job names.
+  Nothing about their presence should be read as "macOS support has been
+  tested end to end" — the engine has been; the application has not.
 - **Windows Authenticode signing is not configured.** No code-signing
   certificate is available in this environment either. The Windows
   installer PGN Studio's CI produces today is a genuine, working,
