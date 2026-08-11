@@ -26,9 +26,10 @@ never been launched by a human. No Mac is available in this project's
 development environment, but CI now builds the pinned sidecar on Apple
 Silicon and Intel, passes 76/76 of `pgn-extract`'s own upstream suite plus
 all six supplemental regex goldens against it, compiles the Rust crate and
-runs its full test suite on both architectures, and produces an unsigned
-macOS application bundle on Apple Silicon. Intel currently packages the
-`.app` but fails to build its `.dmg`. See
+runs its full test suite on both architectures, and produces unsigned
+macOS application bundles on both Apple Silicon and Intel. The Intel
+`.dmg` step is intermittent — a known `hdiutil` problem on GitHub's macOS
+runners, not a fault here — so that leg occasionally goes red. See
 [`docs/release-process.md`](./docs/release-process.md),
 [`docs/acceptance-criteria.md`](./docs/acceptance-criteria.md), and
 [`DECISIONS-LEDGER.md`](./DECISIONS-LEDGER.md) D-006 for the precise,
