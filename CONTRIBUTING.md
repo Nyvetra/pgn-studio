@@ -49,6 +49,29 @@ npm test               # Vitest (React Testing Library)
 npm run lint            # ESLint
 ```
 
+**Build the engine sidecar before any Rust command.** A fresh clone (or a
+new `git worktree`) has an empty `src-tauri/binaries/` - everything there
+except its README is gitignored build output, by design. Until you build
+it once, *every* Rust command that compiles the crate fails, starting
+with:
+
+```text
+resource path `binaries\pgn-extract-x86_64-pc-windows-msvc.exe` doesn't exist
+```
+
+```powershell
+pwsh ./scripts/build-pgn-extract.ps1   # ~1 min; fetches pinned sources, compiles, installs
+```
+
+That one command is enough for `cargo check`/`test`/`clippy`. It is not
+optional tidiness: `tauri.conf.json`'s `bundle.externalBin` makes
+`build.rs` fail without the binary, `src-tauri/src/engine/capability.rs`
+embeds the generated `build-info-<triple>.json` via `include_str!` at
+compile time, and several `engine::sidecar` tests checksum-verify and
+actually execute the real pinned binary. Copying a sidecar in by hand is
+not a substitute - the build script writes the matching `build-info` and
+`checksums.json` alongside it. See `src-tauri/binaries/README.md`.
+
 ```sh
 cd src-tauri
 cargo check
