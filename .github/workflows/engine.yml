@@ -14,14 +14,18 @@
 # in engine-src/upstream.lock.
 #
 # Per architecture.md §21.1, the target CI matrix is Windows x64, macOS
-# Apple Silicon, and macOS Intel. Only the Windows job has actually been
-# run/verified so far (this project's development environment is Windows).
-# The macOS legs are real, executable job definitions - reviewed for
-# correctness against Apple clang/Tauri documentation - but have never
-# actually been run, exactly like scripts/build-pgn-extract.sh's own
-# "UNTESTED FROM THIS MACHINE" header says. They are marked
-# `unverified: true` (continue-on-error) and named accordingly; do not
-# read their presence here as "macOS has been verified."
+# Apple Silicon, and macOS Intel. Windows is the only fully green leg
+# (this project's development environment is Windows). The macOS legs
+# have now actually run - and the engine half of them works: both build,
+# smoke-check and install a real sidecar, and verify-engine.ps1 passes
+# Layers 0-2 on it (76/76 upstream targets). They still fail overall, at
+# Layer 3, because that layer compares output byte-for-byte against
+# CRLF-stored goldens while the macOS engine emits LF - a fixture
+# artifact, not an engine defect (engine-src/README.md's macOS section
+# has the proof). They stay marked `unverified: true`
+# (continue-on-error) and named accordingly: macOS reproducibility is
+# still unmeasured and no macOS bundle has ever been produced, so do not
+# read a green run here as "macOS has been verified."
 #
 # The Intel leg is `macos-15-intel`, NOT `macos-13`. GitHub retired the
 # macOS 13 runner image in December 2025, and a job requesting a retired

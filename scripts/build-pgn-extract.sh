@@ -1,15 +1,33 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# *** UNTESTED FROM THIS MACHINE ***
+# *** FIRST RUN COMPLETED ON CI - PARTIALLY VERIFIED ***
 # This script was authored on a Windows-only development machine (no Mac
-# is available - decisions ledger D-006). It mirrors
-# scripts/build-pgn-extract.ps1's contract and has been reviewed for
-# correctness against Apple clang / macOS documentation, but it has
-# never actually been run. Treat its first real run (a macOS CI leg, or
-# a contributor's Mac) as a verification step, not a formality - report
-# any deviation from this file's assumptions rather than silently
-# patching around it.
+# is available - decisions ledger D-006) and mirrors
+# scripts/build-pgn-extract.ps1's contract. It has now actually been run,
+# on GitHub Actions macos-14 (Apple Silicon) and macos-15-intel, and it
+# WORKS end to end on both: Apple clang 15.0.0 compiles and links the
+# pinned commit, the smoke check passes, and the sidecar installs
+# (aarch64-apple-darwin: 214680 bytes, sha256 83c4eae6...). Downstream,
+# scripts/verify-engine.ps1 then passes Layers 0-2 on that binary,
+# including 76/76 of pgn-extract's own upstream test suite.
+#
+# Two real findings came out of that first run, both now fixed here or
+# recorded:
+#   - The --version smoke check captured stdout only, while pgn-extract
+#     writes --version to stderr. It failed on an empty capture despite
+#     having built a perfectly good binary. Fixed (see the 2>&1 note at
+#     the smoke check itself).
+#   - The file was committed mode 100644, so CI could not execute it at
+#     all ("Permission denied"). Fixed; keep the executable bit.
+#
+# Still unverified: the reproducibility flags (-D__DATE__/-D__TIME__,
+# -Wl,-no_uuid) have not been checked for their intended *effect* - no
+# two-build comparison has been done on macOS - and no macOS run has
+# passed verify-engine.ps1 Layer 3 (see engine-src/README.md's macOS
+# section for why that is a fixture line-ending artifact, not an engine
+# defect). Keep reporting deviations rather than silently patching
+# around them.
 #
 # Builds the pgn-extract sidecar for aarch64-apple-darwin or
 # x86_64-apple-darwin from the pinned source in engine-src/upstream.lock:

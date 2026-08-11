@@ -143,10 +143,20 @@ from their Rust source of truth.
   On Windows: `scripts/verify-engine.ps1` Layer 2 (pgn-extract's own ~76
   upstream test targets) passes 76/76 with an empty, committed skip list;
   Layer 3 (`fixtures/golden/regex/`, 6 supplemental goldens proving TRE is
-  actually linked and functioning) passes 6/6. On macOS: **not achievable
-  here** — no Mac is available in this development environment (decisions
-  ledger D-006), so `scripts/build-pgn-extract.sh` has never been run and
-  the golden suite has never executed on either macOS architecture. See
+  actually linked and functioning) passes 6/6. On macOS: **now actually
+  run, and passing everything except a fixture artifact.** No Mac is
+  available in this development environment (decisions ledger D-006), but
+  the CI legs have since executed on `macos-14` and `macos-15-intel`:
+  `scripts/build-pgn-extract.sh` builds and installs the sidecar on both,
+  and `verify-engine.ps1` passes Layer 0, Layer 1, and **Layer 2 76/76**
+  against it. Layer 3 reports 0/6 there, but that is a *fixture* problem,
+  not an engine one: the goldens are compared byte-for-byte and are stored
+  CRLF (`.gitattributes` pins `fixtures/** -text`), while the macOS engine
+  emits LF. Stripping `\r` from each committed golden reproduces the macOS
+  run's actual SHA-256 exactly, in all six cases — so macOS output is
+  content-identical to Windows for literal, anchors, bracket, star,
+  backreference, and the `grammar.c` odds call site. Making Layer 3 pass
+  on macOS needs a newline-normalizing comparison, not an engine fix. See
   `docs/release-process.md`.
 
 - [~] **Unicode paths work.** — Partially verified: **Windows verified,
@@ -232,11 +242,12 @@ from their Rust source of truth.
 - [ ] **macOS app and sidecar are signed and notarized.** — Not achievable
   here. No Mac and no Apple Developer ID Application certificate are
   available in this environment (decisions ledger D-006). The macOS CI
-  legs exist and are real, reviewed workflow definitions, but are marked
-  `unverified: true` and have never actually executed on real hardware. A
-  notarization step is stubbed, inert, and secret-gated in
-  `.github/workflows/engine.yml`, ready to activate once credentials are
-  provisioned.
+  legs have since executed on real hardware and build a working sidecar,
+  but they remain marked `unverified: true` and no macOS *bundle* has
+  ever been produced — the legs stop at engine verification, well before
+  `tauri build`. A notarization step is stubbed, inert, and secret-gated
+  in `.github/workflows/engine.yml`, ready to activate once credentials
+  are provisioned.
 
 - [x] **Exact engine source and patches are available.** — Verified.
   `engine-src/upstream.lock` pins the exact commit (with a mirror for

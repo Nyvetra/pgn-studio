@@ -403,11 +403,41 @@ anything the project currently asserts.
   (POSIX `glob(3)`, no `GLOB_NOSORT`), so unlike the Windows script's
   `Get-ChildItem`, no separate explicit-sort step was needed there.
 
-Per the standing caveat at the top of `scripts/build-pgn-extract.sh` and
-in `upstream.lock`, **none of this has been run on real macOS hardware**
-(no Mac is available in this development environment - decisions ledger
-D-006). Treat its first real run as verification of these specific flags
-too, not just of the rest of the script.
+**Update: it has now been run on real macOS hardware** (GitHub Actions
+`macos-14` and `macos-15-intel`, run 31497585623). No Mac is available in
+this development environment - decisions ledger D-006 - but the CI legs
+are real hardware, and the script works on both architectures: Apple
+clang 15.0.0 compiles and links the pinned commit, the smoke check
+passes, and the sidecar installs (`aarch64-apple-darwin`: 214680 bytes,
+sha256 `83c4eae6...`). `verify-engine.ps1` then passes Layer 0, Layer 1,
+and **Layer 2 at 76/76** against that binary - the macOS build clears
+pgn-extract's entire own regression suite.
+
+Two caveats keep this at "builds", not "verified":
+
+- **The reproducibility flags above are still unmeasured.**
+  `-D__DATE__`/`-D__TIME__`/`-Wno-builtin-macro-redefined` and
+  `-Wl,-no_uuid` are *applied*, and nothing about them broke the build,
+  but no two-build comparison has ever been done on macOS. Their intended
+  effect is unproven; do not extend the Windows reproducibility evidence
+  to macOS.
+- **Layer 3 reports 0/6 on macOS, and it is a fixture artifact, not an
+  engine defect.** Layer 3 compares output byte-for-byte against
+  `fixtures/golden/regex/*-expected.pgn`, which are stored CRLF and
+  pinned that way by `.gitattributes` (`fixtures/** -text`); the macOS
+  engine emits LF. Stripping `\r` from each committed golden reproduces
+  the macOS run's *actual* SHA-256 exactly, in all six cases - so the
+  macOS output is content-identical to Windows for literal, anchors,
+  bracket, star, backreference, and the `grammar.c` odds call site.
+  Apple's libc regex matched TRE on every supplemental case. Making this
+  pass needs a newline-normalizing comparison in Layer 3, not an engine
+  change.
+
+Two bugs did surface on that first run, both since fixed: the script was
+committed non-executable (mode 100644, so CI could not run it at all),
+and its `--version` smoke check captured stdout only while pgn-extract
+writes `--version` to stderr. Keep treating macOS runs as verification
+rather than formality - the first one found two real defects.
 
 ## Updating the pin
 
