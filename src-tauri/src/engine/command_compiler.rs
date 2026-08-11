@@ -758,16 +758,60 @@ mod tests {
     };
     use uuid::Uuid;
 
+    // Absolute fixture roots, spelled per platform. `validate_structural`
+    // (called first by `compile`) rejects any non-absolute input path, and
+    // `C:\in\a.pgn` is a *relative* single-component path on Unix - so a
+    // Windows-only literal would silently turn every test below into an
+    // assertion about InvalidSpec rather than about what it names.
+    #[cfg(windows)]
+    mod roots {
+        pub const ENGINE_PATH: &str = r"C:\engine\pgn-extract.exe";
+        pub const WORKSPACE_ROOT: &str = r"C:\workspace\job-1";
+        pub const ECO_FILE: &str = r"C:\resources\eco.pgn";
+        pub const DEST_DIR: &str = r"C:\dest";
+        pub const IN_DIR: &str = r"C:\in";
+        pub const MASTER_PGN: &str = r"C:\master.pgn";
+        pub const MASTER_TXT: &str = r"C:\master.txt";
+    }
+
+    #[cfg(not(windows))]
+    mod roots {
+        pub const ENGINE_PATH: &str = "/engine/pgn-extract";
+        pub const WORKSPACE_ROOT: &str = "/workspace/job-1";
+        pub const ECO_FILE: &str = "/resources/eco.pgn";
+        pub const DEST_DIR: &str = "/dest";
+        pub const IN_DIR: &str = "/in";
+        pub const MASTER_PGN: &str = "/master.pgn";
+        pub const MASTER_TXT: &str = "/master.txt";
+    }
+
+    use roots::*;
+
+    /// Builds an expected path with the platform's own separator, by the
+    /// same `PathBuf::push`/`join` arithmetic the compiler itself uses.
+    fn under(root: &str, components: &[&str]) -> String {
+        let mut path = PathBuf::from(root);
+        for component in components {
+            path.push(component);
+        }
+        path.to_string_lossy().into_owned()
+    }
+
+    /// The standard input fixture path, `IN_DIR/<name>`.
+    fn in_file(name: &str) -> String {
+        under(IN_DIR, &[name])
+    }
+
     fn minimal_caps() -> EngineCapabilities {
         crate::engine::capability::pinned_v26_06()
     }
 
     fn minimal_layout() -> CompileLayout {
         CompileLayout {
-            engine: EngineExecutable::new_unverified(PathBuf::from(r"C:\engine\pgn-extract.exe")),
-            workspace_root: PathBuf::from(r"C:\workspace\job-1"),
-            eco_file: PathBuf::from(r"C:\resources\eco.pgn"),
-            destination_dir: PathBuf::from(r"C:\dest"),
+            engine: EngineExecutable::new_unverified(PathBuf::from(ENGINE_PATH)),
+            workspace_root: PathBuf::from(WORKSPACE_ROOT),
+            eco_file: PathBuf::from(ECO_FILE),
+            destination_dir: PathBuf::from(DEST_DIR),
         }
     }
 
@@ -777,12 +821,12 @@ mod tests {
             id: Uuid::nil(),
             name: "test".to_string(),
             inputs: vec![InputFile {
-                path: PathBuf::from(r"C:\in\a.pgn"),
+                path: PathBuf::from(in_file("a.pgn")),
                 display_name: "a.pgn".to_string(),
                 priority: 0,
             }],
             output: OutputPlan {
-                directory: PathBuf::from(r"C:\dest"),
+                directory: PathBuf::from(DEST_DIR),
                 base_name: "out".to_string(),
                 unique_games: true,
                 duplicate_games: DuplicateOutput::None,
@@ -836,10 +880,16 @@ mod tests {
                 OsString::from("-s"),
                 OsString::from("--summary"),
                 OsString::from(format!(
-                    r"-oC:\dest\.pgnstudio-tmp-{}-unique.pgn",
-                    &spec.id.simple().to_string()[..12]
+                    "-o{}",
+                    under(
+                        DEST_DIR,
+                        &[&format!(
+                            ".pgnstudio-tmp-{}-unique.pgn",
+                            &spec.id.simple().to_string()[..12]
+                        )]
+                    )
                 )),
-                OsString::from(r"C:\in\a.pgn"),
+                OsString::from(in_file("a.pgn")),
             ]
         );
     }
@@ -912,7 +962,7 @@ mod tests {
                 OsString::from("-s"),
                 OsString::from("--summary"),
                 OsString::from("-r"),
-                OsString::from(r"C:\in\a.pgn"),
+                OsString::from(in_file("a.pgn")),
             ]
         );
     }
@@ -942,7 +992,7 @@ mod tests {
     #[test]
     fn check_file_without_duplicate_policy_is_rejected() {
         let mut spec = minimal_spec();
-        spec.operations.check_file = Some(PathBuf::from(r"C:\master.pgn"));
+        spec.operations.check_file = Some(PathBuf::from(MASTER_PGN));
         let err = compile(&spec, &minimal_caps(), &minimal_layout()).unwrap_err();
         assert!(
             matches!(err, CompileError::InvalidSpec { field, .. } if field == "operations.checkFile")
@@ -953,7 +1003,7 @@ mod tests {
     fn check_file_requiring_pgn_suffix() {
         let mut spec = minimal_spec();
         spec.operations.duplicates = DuplicatePolicy::SuppressKeepFirst;
-        spec.operations.check_file = Some(PathBuf::from(r"C:\master.txt"));
+        spec.operations.check_file = Some(PathBuf::from(MASTER_TXT));
         let err = compile(&spec, &minimal_caps(), &minimal_layout()).unwrap_err();
         assert!(
             matches!(err, CompileError::InvalidSpec { field, .. } if field == "operations.checkFile")
@@ -1019,7 +1069,11 @@ mod tests {
     #[test]
     fn display_command_is_inert_text_even_with_shell_metacharacters() {
         let mut spec = minimal_spec();
-        spec.inputs[0].path = PathBuf::from(r"C:\in\$(rm -rf /) && evil %CD%.pgn");
+        // A filename carrying POSIX command substitution, `&&`, and a cmd.exe
+        // variable reference at once - dangerous on either platform, which is
+        // the point. Built under IN_DIR so it stays absolute on Unix.
+        let evil = in_file("$(rm -rf /) && evil %CD%.pgn");
+        spec.inputs[0].path = PathBuf::from(&evil);
         let compiled = compile(&spec, &minimal_caps(), &minimal_layout()).unwrap();
         // The raw text is present (quoted for display), but nothing in this
         // crate ever parses display_command back into a command: the only
@@ -1029,9 +1083,6 @@ mod tests {
         assert!(compiled.display_command.contains("%CD%"));
         assert!(compiled.display_command.starts_with("pgn-extract "));
         // The dangerous path is exactly one argv element, verbatim.
-        assert!(compiled
-            .args
-            .iter()
-            .any(|a| a == OsStr::new(r"C:\in\$(rm -rf /) && evil %CD%.pgn")));
+        assert!(compiled.args.iter().any(|a| a == OsStr::new(&evil)));
     }
 }
