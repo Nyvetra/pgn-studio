@@ -20,12 +20,17 @@ quality** (see architecture.md §24). The Version 1 MVP workflow described
 below is implemented and tested end to end against the real, pinned engine
 sidecar - this is a working application, not a scaffold. What remains
 before a genuine public release is entirely in packaging/distribution, not
-the app itself: macOS builds are unverified (no Mac is available in this
-project's development environment) and neither Windows nor macOS release
-artifacts are code-signed yet (no certificates available). See
-[`docs/release-process.md`](./docs/release-process.md) and
-[`docs/acceptance-criteria.md`](./docs/acceptance-criteria.md) for the
-precise, honest breakdown of what is verified versus what is not.
+the app itself: no macOS application bundle has ever been produced, and
+neither Windows nor macOS release artifacts are code-signed yet (no
+certificates available). The macOS *engine* is in better shape than that
+sounds — no Mac is available in this project's development environment,
+but the CI legs now build the sidecar on Apple Silicon and Intel and pass
+76/76 of `pgn-extract`'s own upstream suite against it; the Rust crate
+still does not compile there. See
+[`docs/release-process.md`](./docs/release-process.md),
+[`docs/acceptance-criteria.md`](./docs/acceptance-criteria.md), and
+[`DECISIONS-LEDGER.md`](./DECISIONS-LEDGER.md) D-006 for the precise,
+honest breakdown of what is verified versus what is not.
 
 As of this phase: 300+ Rust tests and 230+ frontend tests passing,
 `clippy`/`fmt`/`eslint`/`tsc` all clean, and a five-step workflow UI backed
