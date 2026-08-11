@@ -141,8 +141,52 @@ jobs:
       # Unsigned on purpose - see this file's own header comment and
       # docs/release-process.md. `tauri build`'s own `beforeBuildCommand`
       # (tauri.conf.json) runs `npm run build` for us.
-      - name: Build the Tauri application bundle
+      #
+      # Windows builds once. macOS retries, because `hdiutil` intermittently
+      # fails DMG creation with 'Resource busy' on GitHub's macOS runners
+      # (actions/runner-images#7522) - observed here failing on
+      # macos-15-intel in run 31533789885 and succeeding on the identical
+      # step in 31535290496, with the failing run's cleanup reporting an
+      # orphaned `diskimages-helper`, i.e. hdiutil still holding the image.
+      # Windows has no equivalent failure mode, so it is deliberately left
+      # as a single attempt rather than given a retry it does not need.
+      - name: Build the Tauri application bundle (Windows)
+        if: runner.os == 'Windows'
         run: npm run tauri build
+
+      # `--verbose` is the more important half of this step. Without it
+      # Tauri swallows bundle_dmg.sh's stdout and stderr entirely, so the
+      # first failure logged nothing beyond "failed to run bundle_dmg.sh"
+      # and could not be diagnosed at all - the cause had to be inferred
+      # from an orphaned process name in the runner's cleanup output. If
+      # this now fails all three attempts, the log will say why.
+      - name: Build the Tauri application bundle (macOS, retried)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -u
+          attempts=3
+          for attempt in $(seq 1 "$attempts"); do
+            echo "::group::tauri build (attempt $attempt of $attempts)"
+            if npm run tauri build -- --verbose; then
+              echo "::endgroup::"
+              echo "bundled successfully on attempt $attempt"
+              exit 0
+            fi
+            echo "::endgroup::"
+            if [ "$attempt" -lt "$attempts" ]; then
+              echo "attempt $attempt failed - clearing partial dmg output, then retrying in 20s"
+              # Build output only. Never touches sources, and never the
+              # macos/ directory holding the .app that bundles fine even
+              # when the .dmg step trips.
+              rm -rf src-tauri/target/release/bundle/dmg
+              sleep 20
+            fi
+          done
+          echo "tauri build failed $attempts times. That is past the point where the known"
+          echo "hdiutil flake is a sufficient explanation - read the --verbose output above"
+          echo "for bundle_dmg.sh's own error rather than assuming CI flakiness."
+          exit 1
 
       - name: Upload the unsigned bundle for inspection
         uses: actions/upload-artifact@v4
