@@ -7,6 +7,7 @@
 //! frontend) never touches paths directly.
 
 pub mod duplicate_audit;
+pub mod eco_merge;
 pub mod export;
 pub mod folder_scan;
 pub mod identity;

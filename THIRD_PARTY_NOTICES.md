@@ -6,7 +6,8 @@ components distributed with PGN Studio and their license obligations, per
 architecture.md §17.2.
 
 This file currently covers the two third-party items bundled or pinned in
-Phase 0. Rust crate and npm package license notices (compile-time/runtime
+Phase 0, plus the `eco.json` opening dataset added later (see "eco.json"
+below). Rust crate and npm package license notices (compile-time/runtime
 dependencies) are **not** enumerated here yet - see "Runtime dependency
 notices" below for why, and `scripts/README.md` for the planned
 `generate-notices.*` automation that will populate them before a release.
@@ -164,6 +165,83 @@ commit:
 
 See `src-tauri/resources/pgn-extract/SOURCE.json` for the machine-readable
 version of both entries above, including file checksums.
+
+---
+
+## eco.json (supplementary opening classification data)
+
+- **What it is:** A JSON dataset of ECO codes, opening names, and the move
+  sequences that reach them, aggregated from several public sources. PGN
+  Studio uses it to generate a *supplement* to the bundled `eco.pgn`,
+  covering opening lines `eco.pgn` does not classify at all.
+- **Upstream repository:** <https://github.com/hayatbiralem/eco.json>
+- **License:** MIT (declared by the repository; notice reproduced below).
+- **Vendored at:** `data/eco-json/ecoA.json` ... `ecoE.json` (five volume
+  files, SHA-256 recorded in
+  `src-tauri/resources/eco-supplement/SOURCE.json`). These are build
+  inputs and are **not** shipped in the application bundle.
+- **Upstream commit: not yet pinned.** The files were supplied as a local
+  download rather than a verified checkout, so - unlike pgn-extract above -
+  no upstream commit/tag is recorded yet. The per-file SHA-256 values are
+  recorded so the exact bytes used are identifiable, but the
+  pin-and-verify step this project applies to the engine has not been
+  completed for this dataset. See `SOURCE.json`'s `vendored.commitNote`.
+- **Attribution (from the upstream README):** credits @niklasf for the
+  original eco project, Shane Hudson for the SCID data, and Ömür Yanıkoğlu
+  for the original eco.json compilation; @JeffML is noted as the primary
+  contributor, with a maintained fork at
+  <https://github.com/JeffML/eco.json>. The dataset itself aggregates the
+  Lichess chess-openings database, the SCID project, Wikipedia's "List of
+  Chess Openings" and Wikibooks' "Chess Opening Theory", ChessTempo, the
+  chess-graph project, and additional PGN databases and the icsbot
+  project. Each record names its own origin in a `src` field.
+
+### What PGN Studio derives from it, and what it does not touch
+
+`scripts/build-eco-supplement.mjs` generates
+`src-tauri/resources/eco-supplement/eco-supplement.pgn` (10,642 entries)
+from the vendored dataset. That generated file **is** shipped, and is a
+derivative work of the MIT-licensed dataset, distributed under the same
+MIT terms.
+
+The generator opens the bundled `eco.pgn` **read-only**, solely to
+determine which opening lines are already classified so it can exclude
+them. `eco.pgn` is not modified, not rewritten, and not merged into on
+disk; its recorded SHA-256 in `resources/pgn-extract/SOURCE.json` remains
+authoritative and `"modified": false` remains accurate. At runtime the two
+files are concatenated into a **cache** directory, bundled content first,
+and only that cached copy is passed to the engine.
+
+Because the bundled content is emitted first and `pgn-extract` resolves a
+duplicated line to its first occurrence, no classification `eco.pgn`
+already provides can be overridden by this supplement. That guarantee is
+verified end-to-end against the real engine, not merely argued: see
+`src-tauri/tests/eco_supplement_integration.rs`.
+
+### MIT license notice
+
+> MIT License
+>
+> Copyright (c) 2017 Ömür Yanıkoğlu
+>
+> Permission is hereby granted, free of charge, to any person obtaining a
+> copy of this software and associated documentation files (the
+> "Software"), to deal in the Software without restriction, including
+> without limitation the rights to use, copy, modify, merge, publish,
+> distribute, sublicense, and/or sell copies of the Software, and to
+> permit persons to whom the Software is furnished to do so, subject to
+> the following conditions:
+>
+> The above copyright notice and this permission notice shall be included
+> in all copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+> OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+> MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+> IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+> CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+> TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+> SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 

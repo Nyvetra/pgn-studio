@@ -91,7 +91,16 @@ Below the presets:
 - **Cleanup**: remove comments, variations, and NAGs independently of each
   other.
 - **ECO classification**: add opening codes/names, when the engine build
-  supports it (it does, in the pinned build this app ships).
+  supports it (it does, in the pinned build this app ships). PGN Studio
+  classifies against the engine's own ECO database plus a supplementary
+  dataset of 10,642 additional opening lines, so a game usually gets a more
+  specific name than the base database alone gives — `1. b4 c5` comes back
+  as "Polish Opening / Birmingham Gambit" rather than just "Polish
+  (Sokolsky) opening." The base database always takes precedence where it
+  has an entry, so the supplement only ever adds detail, never changes an
+  existing classification. One cosmetic consequence: the two datasets
+  capitalise names differently ("Ware (Meadow Hay) opening" vs "Ware
+  Opening"), so both styles can appear in the same output.
 - **Master/check file**: an optional single `.pgn` to compare against
   without including its own games in the output — what "New Games Against
   Master" uses under the hood.

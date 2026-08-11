@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "eco-supplement",
+  "description": "Identity and provenance record for PGN Studio's generated ECO supplement. This is a DERIVED, first-party artifact - not a third-party file redistributed as-is, and not a modified copy of pgn-extract's eco.pgn. See THIRD_PARTY_NOTICES.md for the compliance narrative and resources/pgn-extract/SOURCE.json for the separate, unmodified eco.pgn record.",
+  "relationshipToBundledEcoPgn": {
+    "ecoPgnIsModified": false,
+    "note": "src-tauri/resources/pgn-extract/eco.pgn is redistributed byte-for-byte unmodified and its SHA-256 in resources/pgn-extract/SOURCE.json remains authoritative. scripts/build-eco-supplement.mjs opens it READ-ONLY, solely to determine which opening lines are already classified so they can be EXCLUDED from the supplement. At runtime the two files are concatenated into the app cache directory (filesystem::eco_merge) with the bundled content first; neither resource file is ever written to.",
+    "whyConcatenationRatherThanTwoFlags": "pgn-extract accepts exactly one ECO file. Passing -e twice does not union the two: the second occurrence replaces the first, and the first file's lines are never loaded. Verified empirically against the pinned sidecar (pgn-extract v26-06) - with `-e<eco.pgn> -e<supplement>` the game `1. b4 Nh6`, a line present only in eco.pgn, returned no ECO tags at all.",
+    "whyBundledContentGoesFirst": "pgn-extract resolves a move sequence appearing more than once in an ECO file to its FIRST occurrence, verified empirically against the same binary. Emitting the bundled content first therefore makes every classification eco.pgn already provides unoverridable. This is redundant with the generator's own exclusion of already-classified lines, and deliberately so."
+  },
+  "upstream": {
+    "name": "eco.json",
+    "repository": "https://github.com/hayatbiralem/eco.json",
+    "license": "MIT",
+    "licenseEvidence": "The repository declares an MIT license. Confirmed against the repository on 2026-08-10; record the commit/tag actually vendored in `vendored.commit` below before release.",
+    "attribution": "The upstream README credits @niklasf for the original eco project, Shane Hudson for the SCID data, and Ömür Yanıkoğlu for the original eco.json compilation, and notes that @JeffML has become the primary contributor (see the maintained fork at https://github.com/JeffML/eco.json).",
+    "aggregatedSources": [
+      "Lichess chess-openings database",
+      "SCID project",
+      "Wikipedia 'List of Chess Openings' and Wikibooks 'Chess Opening Theory'",
+      "ChessTempo",
+      "chess-graph project",
+      "additional PGN databases and the icsbot project"
+    ],
+    "aggregatedSourcesNote": "Each entry in the dataset carries its own `src` field naming which of the above it came from. In the 10642 entries actually used by the supplement the breakdown is: scid=7860, eco_tsv=1949, wiki_b=560, chessGraph=153, eco_js=48, ct=45, eco_wikip.g=12, pgn=9, eco_wikip=4, icsbot=2. PGN Studio redistributes the derived supplement under the upstream MIT license; the MIT notice is reproduced in THIRD_PARTY_NOTICES.md."
+  },
+  "vendored": {
+    "path": "data/eco-json/",
+    "commit": null,
+    "commitNote": "NOT YET RECORDED. The files were provided as a local download rather than a verified checkout, so no upstream commit/tag is pinned. Before release, re-fetch from the repository at a known commit, confirm the SHA-256 values below still match, and fill this field in - matching the pin-and-verify discipline resources/pgn-extract/SOURCE.json applies to the engine.",
+    "files": [
+      {
+        "path": "data/eco-json/ecoA.json",
+        "sha256": "2b43e348e4d16cf4ab9b91053ba60f65ab4d486931c6204f361736ec0149fc0a",
+        "bytes": 873569
+      },
+      {
+        "path": "data/eco-json/ecoB.json",
+        "sha256": "b95245d3e2a2dae2bcb0cd7cbdc04450bce6e6cea22298700c53caf1ad2d44ed",
+        "bytes": 954270
+      },
+      {
+        "path": "data/eco-json/ecoC.json",
+        "sha256": "4762fcd896d43a21469e118d7d88e60e45d4ecbbe4e12d790783b401764900bc",
+        "bytes": 1131107
+      },
+      {
+        "path": "data/eco-json/ecoD.json",
+        "sha256": "f946e346a2b798ded4620b83deda0fd45a4bf705124da6d8a30ec51ee17c8b51",
+        "bytes": 806257
+      },
+      {
+        "path": "data/eco-json/ecoE.json",
+        "sha256": "5f7db27d82f8f5c87236c0a86da17d055176bdff85d53be9c6c002e3b9c4697f",
+        "bytes": 629398
+      }
+    ]
+  },
+  "derivation": {
+    "generator": "scripts/build-eco-supplement.mjs",
+    "output": "src-tauri/resources/eco-supplement/eco-supplement.pgn",
+    "reproducible": "Deterministic. Entries are sorted by (eco, ply-count, move key), so regenerating from unchanged inputs produces a byte-identical file. `node scripts/build-eco-supplement.mjs --check` fails if the committed file has drifted from its inputs; CI runs it.",
+    "selectionRules": [
+      "Only entries whose `eco` matches /^[A-E][0-9]{2}$/ are kept (6 malformed codes rejected).",
+      "Only entries with a non-empty `moves` field are kept - pgn-extract classifies by move sequence, so an entry without moves cannot classify anything.",
+      "Any line whose normalized move sequence already appears in the bundled eco.pgn is excluded (1729 excluded).",
+      "Within the dataset itself, the first occurrence of a duplicated move sequence wins (2 excluded).",
+      "The dataset's single `name` string is split on the first ':' into [Opening] and [Variation] to match eco.pgn's own tag shape."
+    ],
+    "counts": {
+      "sourceEntries": 12379,
+      "bundledEcoPgnLines": 2014,
+      "excludedAlreadyClassified": 1729,
+      "excludedMalformedEco": 6,
+      "excludedDuplicateLine": 2,
+      "supplementEntries": 10642
+    },
+    "verification": "tests/eco_supplement_integration.rs classifies all 2014 bundled eco.pgn lines against the real sidecar with eco.pgn alone and with the merged file, and asserts every classification is identical - the merged file cannot change an existing result. It also asserts the supplement genuinely adds classifications the bundled file alone does not produce."
+  },
+  "knownCosmeticDifference": "The two datasets use different naming conventions - eco.pgn writes 'Ware (Meadow Hay) opening' (lowercase 'opening'), the eco.json dataset writes 'Ware Opening'. Merged output therefore mixes both styles depending on which file classified a given game. This is cosmetic only and was accepted deliberately rather than rewriting third-party names."
+}

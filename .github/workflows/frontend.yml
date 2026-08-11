@@ -54,6 +54,13 @@ jobs:
       - name: Lint (ESLint)
         run: npm run lint
 
+      # The committed eco-supplement.pgn is generated from data/eco-json/
+      # plus the bundled eco.pgn. This fails the build if it has drifted
+      # from its inputs, so the shipped resource can never silently stop
+      # matching the dataset it claims to be derived from.
+      - name: Check the generated ECO supplement is up to date
+        run: node scripts/build-eco-supplement.mjs --check
+
       - name: Test (Vitest + React Testing Library)
         run: npm test
 
