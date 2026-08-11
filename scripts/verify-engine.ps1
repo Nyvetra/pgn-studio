@@ -19,8 +19,15 @@
 #      scripts/verify-skips.json.
 #   3. PGN Studio supplemental goldens (fixtures/golden/regex/): the
 #      upstream suite has NO `=~` coverage at all, so this layer proves
-#      the platform regex engine (TRE on Windows) is actually wired in
-#      and functioning, not just linked.
+#      the platform regex engine (TRE on Windows, libc regex on macOS) is
+#      actually wired in and functioning, not just linked.
+#      Comparison is byte-exact first. If and only if that fails, the
+#      case is retried with CRLF/LF normalized - the goldens are stored
+#      CRLF and the macOS engine writes LF - and a pass by that route is
+#      reported as [PASS~] per case, counted separately in the summary,
+#      and recorded as `passedAfterNewlineNormalization` in the JSON
+#      report. It is never silent, and byte-exactness is never weakened
+#      on a platform where it already holds.
 #
 # Usage:
 #   pwsh ./scripts/verify-engine.ps1
@@ -55,6 +62,48 @@ $SkipsPath = Join-Path $PSScriptRoot "verify-skips.json"
 $RegexFixturesDir = Join-Path $RepoRoot "fixtures" "golden" "regex"
 
 . (Join-Path $PSScriptRoot "lib" "engine-common.ps1")
+
+# SHA-256 of a file's bytes with every newline convention collapsed to LF.
+#
+# Layer 3 compares the engine's output against a committed golden. Those
+# goldens were generated on Windows and are stored CRLF, and .gitattributes
+# pins `fixtures/** -text` so git never rewrites them in either direction -
+# deliberately, because several fixtures under fixtures/ exist precisely to
+# test exact bytes (CRLF vs LF, a UTF-8 BOM); see fixtures/README.md. The
+# macOS build of pgn-extract writes LF, so a byte-exact comparison failed
+# all six cases there for a reason that has nothing to do with the regex
+# engine: the outputs are content-identical and only the newline bytes
+# differ. That was confirmed by reproducing each macOS run's actual hash
+# exactly from the committed golden with CR stripped, all six of six.
+#
+# This is a fallback, never the primary check - see the call site.
+function Get-NewlineNormalizedSha256 {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $normalized = [System.Collections.Generic.List[byte]]::new($bytes.Length)
+    for ($i = 0; $i -lt $bytes.Length; $i++) {
+        if ($bytes[$i] -eq 13) {
+            # CR: drop it when it is the CR of a CRLF pair; translate a lone
+            # CR to LF. All three historical conventions therefore normalize
+            # to the same bytes, so this cannot pass a file that merely
+            # *looks* similar - only one whose content is identical once
+            # line endings are set aside.
+            if (($i + 1) -lt $bytes.Length -and $bytes[$i + 1] -eq 10) { continue }
+            $normalized.Add([byte]10)
+            continue
+        }
+        $normalized.Add($bytes[$i])
+    }
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return (($sha.ComputeHash($normalized.ToArray()) | ForEach-Object { $_.ToString('x2') }) -join '')
+    }
+    finally {
+        $sha.Dispose()
+    }
+}
 
 if (-not (Test-Path $LockPath)) { throw "Could not find $LockPath" }
 $lock = Get-Content -Raw -LiteralPath $LockPath | ConvertFrom-Json
@@ -384,6 +433,7 @@ else {
             $exit = $LASTEXITCODE
 
             $pass = $false
+            $newlineNormalized = $false
             $detail = ""
             if ($exit -ne 0) {
                 $detail = "exit code $exit (expected 0)"
@@ -392,31 +442,74 @@ else {
                 $detail = "no output file was produced"
             }
             else {
-                $actualHash = (Get-FileHash -LiteralPath $tempOut -Algorithm SHA256).Hash
-                $expectedHash = (Get-FileHash -LiteralPath $expectedFile -Algorithm SHA256).Hash
+                # Byte-exact is still the primary assertion and still the
+                # strongest result this layer can report - it is tried first
+                # and, where it holds (Windows), nothing below runs. Only
+                # when it fails do we ask the weaker question "is this the
+                # same content with different line endings?", and a pass by
+                # that route is labelled differently everywhere it appears.
+                # Normalizing unconditionally would have been less code and
+                # strictly worse: it would silently stop detecting a real
+                # CRLF/LF regression on Windows, which is exactly the kind
+                # of byte-level change fixtures/ exists to catch.
+                $actualHash = (Get-FileHash -LiteralPath $tempOut -Algorithm SHA256).Hash.ToLowerInvariant()
+                $expectedHash = (Get-FileHash -LiteralPath $expectedFile -Algorithm SHA256).Hash.ToLowerInvariant()
                 if ($actualHash -eq $expectedHash) {
                     $pass = $true
                 }
                 else {
-                    $detail = "output does not byte-match $($case.expected) (sha256 $actualHash vs $expectedHash)"
+                    $actualNormalized = Get-NewlineNormalizedSha256 -Path $tempOut
+                    $expectedNormalized = Get-NewlineNormalizedSha256 -Path $expectedFile
+                    if ($actualNormalized -eq $expectedNormalized) {
+                        $pass = $true
+                        $newlineNormalized = $true
+                        $detail = "line endings differ only - the committed golden is CRLF, this build writes LF. Content is identical after CRLF/LF normalization (sha256 $actualNormalized)."
+                    }
+                    else {
+                        $detail = "output does not match $($case.expected), and not merely in its line endings (raw sha256 $actualHash vs $expectedHash; newline-normalized $actualNormalized vs $expectedNormalized)"
+                    }
                 }
             }
             Remove-Item -LiteralPath $tempOut -ErrorAction SilentlyContinue
 
-            $caseResults.Add([PSCustomObject]@{ name = $case.name; pass = $pass; detail = $detail })
-            if ($pass) { Write-Host "  [PASS] $($case.name) - $($case.description)" }
-            else { Write-Host "  [FAIL] $($case.name) - $detail" }
+            $caseResults.Add([PSCustomObject]@{
+                    name              = $case.name
+                    pass              = $pass
+                    newlineNormalized = $newlineNormalized
+                    detail            = $detail
+                })
+            if ($pass -and $newlineNormalized) {
+                Write-Host "  [PASS~] $($case.name) - $($case.description)"
+                Write-Host "          note: $detail"
+            }
+            elseif ($pass) {
+                Write-Host "  [PASS] $($case.name) - $($case.description)"
+            }
+            else {
+                Write-Host "  [FAIL] $($case.name) - $detail"
+            }
         }
 
         $failedCases = @($caseResults | Where-Object { -not $_.pass })
+        $normalizedCases = @($caseResults | Where-Object { $_.pass -and $_.newlineNormalized })
         $status = if ($failedCases.Count -eq 0) { "pass" } else { "fail" }
         Write-Host ""
         Write-Host "  $($caseResults.Count - $failedCases.Count) / $($caseResults.Count) supplemental golden cases passed"
+        if ($normalizedCases.Count -gt 0) {
+            # Stated at the summary level too, not just per-case: a reader
+            # skimming for "6 / 6 passed" should not be able to miss that
+            # some of those were line-ending-normalized rather than
+            # byte-exact.
+            Write-Host "  of which $($normalizedCases.Count) matched only after CRLF/LF normalization (content identical, line endings differ):"
+            foreach ($nc in $normalizedCases) { Write-Host "    - $($nc.name)" }
+        }
         $layerResults["3-supplemental-goldens"] = [ordered]@{
-            status = $status
-            total  = $caseResults.Count
-            passed = $caseResults.Count - $failedCases.Count
-            cases  = $caseResults
+            status                        = $status
+            total                         = $caseResults.Count
+            passed                        = $caseResults.Count - $failedCases.Count
+            passedByteExact               = $caseResults.Count - $failedCases.Count - $normalizedCases.Count
+            passedAfterNewlineNormalization = $normalizedCases.Count
+            cases                         = $caseResults
         }
     }
     catch {
