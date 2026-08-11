@@ -226,7 +226,17 @@ echo "  built: $BUILT_EXE"
 section "Smoke check: --version"
 EXPECTED_VERSION="pgn-extract $ENGINE_VERSION"
 set +e
-VERSION_OUTPUT="$("$BUILT_EXE" --version)"
+# 2>&1 is load-bearing, exactly as in build-pgn-extract.ps1's equivalent
+# smoke check: pgn-extract writes --version to GlobalState.logfile, which
+# main.c defaults to *stderr*, not stdout. Without the merge this capture
+# comes back empty while the version string sails past to the console -
+# which is precisely how this read on the first real macOS CI run:
+#     pgn-extract v26-06                      <- on the console
+#     ERROR: ... --version printed '', expected exactly 'pgn-extract v26-06'
+# The Windows script has always carried the merge; this one never did, so
+# the macOS build failed its own smoke check despite having compiled and
+# linked a perfectly good binary.
+VERSION_OUTPUT="$("$BUILT_EXE" --version 2>&1)"
 VERSION_EXIT=$?
 set -e
 echo "  exit code : $VERSION_EXIT"
