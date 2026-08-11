@@ -95,14 +95,20 @@ oversights waiting to be filled in casually:
   executable bit and a stdout-only `--version` capture), which is exactly
   why it was worth running rather than assuming.
 
-  What that does **not** mean: macOS reproducibility is still unmeasured
+  Since then CI has gone considerably further: `verify-engine.ps1` passes
+  all four layers on macOS (Layer 3 included, once its comparison stopped
+  requiring CRLF), the Rust crate compiles and passes its full test suite
+  on both architectures, and `Engine and Bundle / macos-14` produces an
+  unsigned macOS application bundle.
+
+  What that does **not** mean: **nobody has ever launched that bundle.**
+  It is a CI artifact, and "builds and packages" is not "runs correctly" —
+  treat its first real launch as verification, exactly as D-006 says to
+  treat a first real build. macOS reproducibility also remains unmeasured
   (the `-D__DATE__`/`-Wl,-no_uuid` flags have never been checked for
-  effect), `verify-engine.ps1` Layer 3 still reports 0/6 there for
-  line-ending reasons documented in `engine-src/README.md`, the Rust
-  crate does not compile on macOS at all yet (`engine::capability`
-  hardcodes the Windows build-info), and consequently **no macOS
-  application bundle has ever been produced.** Do not ship a macOS
-  release on the strength of a working sidecar.
+  effect), and `macos-15-intel` bundles `PGN Studio.app` but then fails in
+  `bundle_dmg.sh`, so there is currently no Intel `.dmg` at all. Do not
+  ship a macOS release on the strength of a green CI run.
 - **macOS code signing and notarization cannot be done here.** Both
   require an Apple Developer ID Application certificate and access to
   Apple's notarization service — neither is available in this environment.

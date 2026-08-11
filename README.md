@@ -20,13 +20,15 @@ quality** (see architecture.md §24). The Version 1 MVP workflow described
 below is implemented and tested end to end against the real, pinned engine
 sidecar - this is a working application, not a scaffold. What remains
 before a genuine public release is entirely in packaging/distribution, not
-the app itself: no macOS application bundle has ever been produced, and
-neither Windows nor macOS release artifacts are code-signed yet (no
-certificates available). The macOS *engine* is in better shape than that
-sounds — no Mac is available in this project's development environment,
-but the CI legs now build the sidecar on Apple Silicon and Intel and pass
-76/76 of `pgn-extract`'s own upstream suite against it; the Rust crate
-still does not compile there. See
+the app itself: no release artifact on either platform is code-signed yet
+(no certificates available), and the macOS build, while it now exists, has
+never been launched by a human. No Mac is available in this project's
+development environment, but CI now builds the pinned sidecar on Apple
+Silicon and Intel, passes 76/76 of `pgn-extract`'s own upstream suite plus
+all six supplemental regex goldens against it, compiles the Rust crate and
+runs its full test suite on both architectures, and produces an unsigned
+macOS application bundle on Apple Silicon. Intel currently packages the
+`.app` but fails to build its `.dmg`. See
 [`docs/release-process.md`](./docs/release-process.md),
 [`docs/acceptance-criteria.md`](./docs/acceptance-criteria.md), and
 [`DECISIONS-LEDGER.md`](./DECISIONS-LEDGER.md) D-006 for the precise,
