@@ -148,15 +148,18 @@ from their Rust source of truth.
   available in this development environment (decisions ledger D-006), but
   the CI legs have since executed on `macos-14` and `macos-15-intel`:
   `scripts/build-pgn-extract.sh` builds and installs the sidecar on both,
-  and `verify-engine.ps1` passes Layer 0, Layer 1, and **Layer 2 76/76**
-  against it. Layer 3 reports 0/6 there, but that is a *fixture* problem,
-  not an engine one: the goldens are compared byte-for-byte and are stored
-  CRLF (`.gitattributes` pins `fixtures/** -text`), while the macOS engine
-  emits LF. Stripping `\r` from each committed golden reproduces the macOS
-  run's actual SHA-256 exactly, in all six cases — so macOS output is
-  content-identical to Windows for literal, anchors, bracket, star,
-  backreference, and the `grammar.c` odds call site. Making Layer 3 pass
-  on macOS needs a newline-normalizing comparison, not an engine fix. See
+  and `verify-engine.ps1` passes **all four layers** against it —
+  including Layer 2 at 76/76 and Layer 3 at 6/6. Layer 3 initially
+  reported 0/6 there, which turned out to be a *fixture* problem rather
+  than an engine one: the goldens are compared byte-for-byte and are
+  stored CRLF (`.gitattributes` pins `fixtures/** -text`), while the macOS
+  engine emits LF. Stripping `\r` from each committed golden reproduced
+  the macOS run's actual SHA-256 exactly, in all six cases — so macOS
+  output is content-identical to Windows for literal, anchors, bracket,
+  star, backreference, and the `grammar.c` odds call site. Layer 3 now
+  compares byte-exact first and falls back to a newline-normalized
+  comparison only on failure, reporting any such case as `[PASS~]` rather
+  than silently; Windows still reports all six as byte-exact. See
   `docs/release-process.md`.
 
 - [~] **Unicode paths work.** — Partially verified: **Windows verified,

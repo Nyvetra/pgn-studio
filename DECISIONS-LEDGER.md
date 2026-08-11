@@ -75,7 +75,10 @@ ledger's header rule exists to prevent.
 
 ## D-006 — No Mac and no signing credentials; how unverifiable platform work is handled
 
-**Status:** active, amended 2026-08-11 (see below).
+**Status:** active, amended twice on 2026-08-11 (see below). The two
+physical constraints and the handling rule are unchanged; what has changed
+is how much of the macOS gap CI has since closed. Read both amendments
+before citing this entry — the first is now partly historical.
 
 ### Decision
 
@@ -149,9 +152,10 @@ instruction was for: the script was committed mode `100644`, so CI could
 not execute it at all, and its `--version` capture read stdout only while
 pgn-extract writes `--version` to stderr. Both fixed.
 
-**Not established, and still open:**
+**Not established at that point (all but one has since changed — see the
+second amendment below):**
 
-- **Layer 3 reports 0/6 on macOS — a fixture artifact, not an engine
+- **Layer 3 reported 0/6 on macOS — a fixture artifact, not an engine
   defect.** Layer 3 compares output byte-for-byte against
   `fixtures/golden/regex/*-expected.pgn`, which are stored CRLF and
   pinned that way by `.gitattributes` (`fixtures/** -text`), while the
@@ -173,6 +177,48 @@ pgn-extract writes `--version` to stderr. Both fixed.
   to the development environment, and still no signing or notarization
   credentials. CI runners closed part of the verification gap; they did
   not close the credential gap at all.
+
+### Amendment 2, 2026-08-11 — a macOS application bundle now exists
+
+Three of the four bullets above are superseded. Established by workflow run
+[31533789885](https://github.com/Nyvetra/pgn-studio/actions/runs/31533789885)
+(commit `c43133d`), with the Rust half established by run
+[31527446775](https://github.com/Nyvetra/pgn-studio/actions/runs/31527446775).
+
+- **Layer 3 now passes on macOS.** `verify-engine.ps1` compares
+  byte-exact first and, only on failure, retries with CRLF/LF normalized —
+  reported as `[PASS~]`, counted separately in the summary, and recorded
+  as `passedAfterNewlineNormalization` in the JSON report. Byte-exactness
+  is unweakened where it already held: the Windows run still reports all
+  six as byte-exact and the fallback never fires there.
+- **The Rust crate compiles and its full test suite passes on macOS**,
+  on both `aarch64` and `x86_64` — 234/234 unit tests plus every
+  integration binary, with `clippy --all-targets -D warnings` clean.
+  `engine::capability` selects `build-info-<triple>.json` by `cfg`, and
+  the golden/compiler fixtures no longer assume Windows-shaped paths.
+- **A macOS application bundle has now been produced.**
+  `Engine and Bundle / macos-14` ran green end to end for the first time
+  and uploaded `pgn-studio-macos-14-unsigned`, 9,531,587 bytes.
+
+**Still open, and the reason this is not "macOS is done":**
+
+- **Nobody has ever launched that bundle.** It was produced by CI and
+  uploaded as an artifact. "Builds and packages" is not "runs correctly",
+  and no Mac is available here to check. Treat the first real launch as
+  verification, exactly as D-006 said to treat the first real build.
+- **The Intel bundle does not package.** On `macos-15-intel` the release
+  binary compiles and `PGN Studio.app` bundles successfully; the run then
+  fails in `bundle_dmg.sh` while producing `PGN Studio_0.1.0_x64.dmg`.
+  So this is a DMG *packaging* failure, not a build failure, and it is
+  specific to that leg — `macos-14` packaged its DMG fine. Cause not
+  established; do not assume it is mere CI flake without checking.
+- **macOS reproducibility is still unmeasured.** Unchanged from the first
+  amendment: no two-build comparison has been run there.
+- **Both original constraints stand entirely unchanged.** Still no Mac
+  available to this development environment, and still no signing or
+  notarization credentials. The bundle above is genuine and unsigned.
+  CI runners have now closed most of the *verification* gap; they have
+  closed none of the *credential* gap.
 
 `engine-src/upstream.lock` records this as `"verified": "builds"` for both
 darwin toolchains — deliberately the string `"builds"`, not `true`.

@@ -15,17 +15,19 @@
 #
 # Per architecture.md §21.1, the target CI matrix is Windows x64, macOS
 # Apple Silicon, and macOS Intel. Windows is the only fully green leg
-# (this project's development environment is Windows). The macOS legs
-# have now actually run - and the engine half of them works: both build,
-# smoke-check and install a real sidecar, and verify-engine.ps1 passes
-# Layers 0-2 on it (76/76 upstream targets). They still fail overall, at
-# Layer 3, because that layer compares output byte-for-byte against
-# CRLF-stored goldens while the macOS engine emits LF - a fixture
-# artifact, not an engine defect (engine-src/README.md's macOS section
-# has the proof). They stay marked `unverified: true`
-# (continue-on-error) and named accordingly: macOS reproducibility is
-# still unmeasured and no macOS bundle has ever been produced, so do not
-# read a green run here as "macOS has been verified."
+# (this project's development environment is Windows). The macOS legs now
+# actually run, and macos-14 runs green end to end: it builds and installs
+# the pinned sidecar, passes all four verify-engine.ps1 layers against it
+# (76/76 upstream targets, 6/6 supplemental goldens), and produces an
+# unsigned macOS application bundle. macos-15-intel gets as far as
+# bundling `PGN Studio.app` and then fails in bundle_dmg.sh while
+# packaging the .dmg - a packaging failure, not a build failure.
+#
+# Both legs stay marked `unverified: true` (continue-on-error) and named
+# accordingly, and that is not vestigial: nobody has ever *launched* the
+# bundle those legs produce, macOS reproducibility is still unmeasured,
+# and no signing or notarization credentials exist. "CI built it" is not
+# "it works" - do not read a green run here as "macOS has been verified."
 #
 # The Intel leg is `macos-15-intel`, NOT `macos-13`. GitHub retired the
 # macOS 13 runner image in December 2025, and a job requesting a retired

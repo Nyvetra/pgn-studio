@@ -421,17 +421,26 @@ Two caveats keep this at "builds", not "verified":
   but no two-build comparison has ever been done on macOS. Their intended
   effect is unproven; do not extend the Windows reproducibility evidence
   to macOS.
-- **Layer 3 reports 0/6 on macOS, and it is a fixture artifact, not an
-  engine defect.** Layer 3 compares output byte-for-byte against
-  `fixtures/golden/regex/*-expected.pgn`, which are stored CRLF and
-  pinned that way by `.gitattributes` (`fixtures/** -text`); the macOS
-  engine emits LF. Stripping `\r` from each committed golden reproduces
-  the macOS run's *actual* SHA-256 exactly, in all six cases - so the
-  macOS output is content-identical to Windows for literal, anchors,
-  bracket, star, backreference, and the `grammar.c` odds call site.
-  Apple's libc regex matched TRE on every supplemental case. Making this
-  pass needs a newline-normalizing comparison in Layer 3, not an engine
-  change.
+- **Layer 3 passes 6/6 on macOS — after a fixture-level fix, not an
+  engine change.** It first reported 0/6 there. Layer 3 compares output
+  byte-for-byte against `fixtures/golden/regex/*-expected.pgn`, which are
+  stored CRLF and pinned that way by `.gitattributes`
+  (`fixtures/** -text`); the macOS engine emits LF. Stripping `\r` from
+  each committed golden reproduced the macOS run's *actual* SHA-256
+  exactly, in all six cases - so the macOS output was content-identical
+  to Windows for literal, anchors, bracket, star, backreference, and the
+  `grammar.c` odds call site. Apple's libc regex matched TRE on every
+  supplemental case, first time.
+
+  Layer 3 now compares byte-exact first and retries with CRLF/LF
+  normalized only when that fails, reporting any such case as `[PASS~]`
+  with a note, counting it separately in the summary, and recording
+  `passedAfterNewlineNormalization` in the JSON report. Byte-exactness is
+  not weakened where it already held: the Windows run still reports all
+  six as byte-exact and never enters the fallback. Normalizing
+  unconditionally would have been fewer lines and strictly worse - it
+  would have stopped detecting a genuine CRLF/LF regression on Windows,
+  which is precisely what these fixtures exist to catch.
 
 Two bugs did surface on that first run, both since fixed: the script was
 committed non-executable (mode 100644, so CI could not run it at all),
