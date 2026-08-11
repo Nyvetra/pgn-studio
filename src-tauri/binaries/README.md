@@ -20,6 +20,35 @@ and actively mislead whoever reads it later. The durable, reviewable
 input is `engine-src/upstream.lock` plus the two build scripts - anyone
 can reproduce everything in this directory from those.
 
+## The Rust crate does not compile until you build one
+
+Because nothing here is committed, a fresh clone or a new `git worktree`
+starts with this README and nothing else - and the `src-tauri` crate
+cannot be compiled at all in that state. `cargo check`, `cargo test`,
+`cargo clippy`, and `cargo run -p xtask -- export-bindings` all fail
+immediately with:
+
+```text
+resource path `binaries\pgn-extract-x86_64-pc-windows-msvc.exe` doesn't exist
+```
+
+Run `pwsh ./scripts/build-pgn-extract.ps1` once and they all work. Three
+separate things depend on the contents of this directory at *build* time,
+which is why a hand-copied binary is not a substitute for running the
+script:
+
+1. `tauri.conf.json`'s `bundle.externalBin: ["binaries/pgn-extract"]` -
+   `tauri_build::build()` checks the file exists (the error above);
+2. `src-tauri/src/engine/capability.rs` embeds
+   `build-info-x86_64-pc-windows-msvc.json` via `include_str!`, so the
+   pinned identity can never drift from the actual binary;
+3. `src-tauri/src/engine/sidecar.rs`'s tests resolve, SHA-256-verify, and
+   *execute* the real binary (`run_self_test`, `probe_unicode_paths`,
+   `startup_check`).
+
+`.github/workflows/rust.yml` builds the sidecar for exactly this reason
+before its Clippy/test/bindings steps.
+
 ## Naming convention
 
 Tauri requires each sidecar to be suffixed with the Rust target triple it
