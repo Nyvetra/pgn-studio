@@ -16,12 +16,17 @@
 # Per architecture.md §21.1, the target CI matrix is Windows x64, macOS
 # Apple Silicon, and macOS Intel. Windows is the only fully green leg
 # (this project's development environment is Windows). The macOS legs now
-# actually run, and macos-14 runs green end to end: it builds and installs
-# the pinned sidecar, passes all four verify-engine.ps1 layers against it
-# (76/76 upstream targets, 6/6 supplemental goldens), and produces an
-# unsigned macOS application bundle. macos-15-intel gets as far as
-# bundling `PGN Studio.app` and then fails in bundle_dmg.sh while
-# packaging the .dmg - a packaging failure, not a build failure.
+# actually run, and both have run green end to end: they build and install
+# the pinned sidecar, pass all four verify-engine.ps1 layers against it
+# (76/76 upstream targets, 6/6 supplemental goldens), and produce unsigned
+# macOS application bundles.
+#
+# Expect macos-15-intel to fail intermittently in bundle_dmg.sh: `hdiutil`
+# fails DMG creation with "Resource busy" now and then on GitHub's macOS
+# runners (actions/runner-images#7522), which is a runner-image problem,
+# not one of ours - the .app bundles fine and only the .dmg step trips. It
+# has been observed failing once and succeeding once from otherwise
+# equivalent commits. Re-run the job before investigating.
 #
 # Both legs stay marked `unverified: true` (continue-on-error) and named
 # accordingly, and that is not vestigial: nobody has ever *launched* the

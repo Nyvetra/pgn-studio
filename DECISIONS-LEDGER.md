@@ -196,9 +196,12 @@ Three of the four bullets above are superseded. Established by workflow run
   integration binary, with `clippy --all-targets -D warnings` clean.
   `engine::capability` selects `build-info-<triple>.json` by `cfg`, and
   the golden/compiler fixtures no longer assume Windows-shaped paths.
-- **A macOS application bundle has now been produced.**
+- **macOS application bundles are now produced on both architectures.**
   `Engine and Bundle / macos-14` ran green end to end for the first time
-  and uploaded `pgn-studio-macos-14-unsigned`, 9,531,587 bytes.
+  and uploaded `pgn-studio-macos-14-unsigned` (9,531,587 bytes);
+  `macos-15-intel` has since done the same, uploading
+  `pgn-studio-macos-15-intel-unsigned` (9,716,792 bytes) in run
+  [31535290496](https://github.com/Nyvetra/pgn-studio/actions/runs/31535290496).
 
 **Still open, and the reason this is not "macOS is done":**
 
@@ -206,12 +209,25 @@ Three of the four bullets above are superseded. Established by workflow run
   uploaded as an artifact. "Builds and packages" is not "runs correctly",
   and no Mac is available here to check. Treat the first real launch as
   verification, exactly as D-006 said to treat the first real build.
-- **The Intel bundle does not package.** On `macos-15-intel` the release
-  binary compiles and `PGN Studio.app` bundles successfully; the run then
-  fails in `bundle_dmg.sh` while producing `PGN Studio_0.1.0_x64.dmg`.
-  So this is a DMG *packaging* failure, not a build failure, and it is
-  specific to that leg — `macos-14` packaged its DMG fine. Cause not
-  established; do not assume it is mere CI flake without checking.
+- **DMG packaging on `macos-15-intel` is intermittent.** In run
+  31533789885 the release binary compiled and `PGN Studio.app` bundled,
+  and the run then failed in `bundle_dmg.sh` producing
+  `PGN Studio_0.1.0_x64.dmg` — a *packaging* failure, not a build
+  failure. In run 31535290496 the identical step succeeded and produced
+  the Intel bundle. `macos-14` packaged fine in both.
+
+  That pattern matches a documented GitHub Actions runner-image problem
+  rather than anything in this project: `hdiutil` intermittently fails
+  DMG creation with "Resource busy"
+  ([actions/runner-images#7522](https://github.com/actions/runner-images/issues/7522),
+  and repeatedly against Tauri, e.g.
+  [tauri-action#801](https://github.com/tauri-apps/tauri-action/issues/801)).
+  The failing run's cleanup reported an orphaned `diskimages-helper`,
+  which is `hdiutil` still holding the image. Expect this leg to fail
+  occasionally; a red DMG step is not by itself evidence of a defect
+  here. Note also that Tauri swallows `bundle_dmg.sh`'s output unless
+  `--verbose` is passed, so such a failure currently logs no cause at
+  all.
 - **macOS reproducibility is still unmeasured.** Unchanged from the first
   amendment: no two-build comparison has been run there.
 - **Both original constraints stand entirely unchanged.** Still no Mac

@@ -106,9 +106,11 @@ oversights waiting to be filled in casually:
   treat its first real launch as verification, exactly as D-006 says to
   treat a first real build. macOS reproducibility also remains unmeasured
   (the `-D__DATE__`/`-Wl,-no_uuid` flags have never been checked for
-  effect), and `macos-15-intel` bundles `PGN Studio.app` but then fails in
-  `bundle_dmg.sh`, so there is currently no Intel `.dmg` at all. Do not
-  ship a macOS release on the strength of a green CI run.
+  effect), and `macos-15-intel`'s `.dmg` step is intermittent — `hdiutil`
+  fails DMG creation with "Resource busy" now and then on GitHub's macOS
+  runners, a runner-image problem rather than one of ours; it has been
+  seen both failing and succeeding, and the `.app` bundles either way. Do
+  not ship a macOS release on the strength of a green CI run.
 - **macOS code signing and notarization cannot be done here.** Both
   require an Apple Developer ID Application certificate and access to
   Apple's notarization service — neither is available in this environment.

@@ -75,7 +75,7 @@
       "linkFlags": ["-Wl,-no_uuid"],
       "verified": "builds",
       "firstRealRun": "GitHub Actions macos-15-intel, 2026-08-11, workflow run 31497585623",
-      "note": "Same standing as the aarch64-apple-darwin entry above, and verified to the same depth: the macos-15-intel CI leg builds, smoke-checks and installs the sidecar successfully. Its per-artifact size/sha256 are deliberately not recorded here - they were not captured from that run, and inventing them would violate this file's never-placeholder rule. The reproducibility caveat above applies here unchanged. Layer 3 now passes on this leg too; note that this leg bundles PGN Studio.app but then fails packaging its .dmg in bundle_dmg.sh, so no Intel installer is produced."
+      "note": "Same standing as the aarch64-apple-darwin entry above, and verified to the same depth: the macos-15-intel CI leg builds, smoke-checks and installs the sidecar successfully. Its per-artifact size/sha256 are deliberately not recorded here - they were not captured from that run, and inventing them would violate this file's never-placeholder rule. The reproducibility caveat above applies here unchanged. Layer 3 now passes on this leg too, and it has produced an unsigned Intel application bundle. Its .dmg step is intermittent - hdiutil fails DMG creation with 'Resource busy' now and then on GitHub's macOS runners (actions/runner-images#7522), a runner-image problem rather than one of ours; observed failing once and succeeding once. The .app bundles either way."
     }
   },
   "lastVerified": "2026-08-07"
