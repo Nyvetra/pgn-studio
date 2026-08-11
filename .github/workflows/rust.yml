@@ -11,6 +11,49 @@
 # intentionally does not attempt a full `tauri build`/bundle step (that
 # needs platform-specific signing/bundling setup that is Phase 6 scope);
 # it only checks that the Rust code itself is well-formed and correct.
+#
+# THE ENGINE SIDECAR IS A BUILD-TIME PREREQUISITE, NOT AN OPTIONAL EXTRA.
+# `src-tauri/binaries/*` is gitignored (only README.md is committed), so a
+# fresh `actions/checkout` has no sidecar, and *nothing that compiles the
+# crate can run* until one exists:
+#
+#   1. tauri.conf.json's `bundle.externalBin: ["binaries/pgn-extract"]`
+#      makes `tauri_build::build()` (build.rs) hard-fail with
+#      "resource path `binaries\pgn-extract-<triple>.exe` doesn't exist";
+#   2. even past that, engine::capability embeds
+#      `binaries/build-info-x86_64-pc-windows-msvc.json` via `include_str!`
+#      at compile time, which is written by the same build script;
+#   3. and six tests in engine::sidecar resolve, checksum-verify, and
+#      actually *execute* the real pinned binary (`run_self_test`,
+#      `probe_unicode_paths`, `startup_check`) - a stub or placeholder
+#      would make those tests silently meaningless.
+#
+# So this job builds the pinned sidecar first, exactly the way engine.yml
+# does - it takes well under a minute. What makes the checksum-pinned
+# tests pass is *self-consistency*, not bit-identical output: the build
+# script writes `build-info-<triple>.json` from the very binary it just
+# installed, and `include_str!` embeds that same file, so the expected
+# SHA-256 is by construction the hash of the binary on disk. (Do not
+# assume the stronger property here: `/Brepro` plus a neutralized
+# `__DATE__` make clean rebuilds byte-for-byte identical only on a fixed
+# MSVC toolset. Three toolsets have now been measured producing three
+# different binaries, differing in both size and hash - see
+# engine-src/README.md's "What `/Brepro` does not fix", which
+# `engine-src/upstream.lock` now states rather than overclaims. Nothing
+# here depends on it; scripts/verify-engine.ps1 is where engine identity
+# is actually policed.)
+#
+# Unlike engine.yml this job does NOT install GNU make and does NOT run
+# scripts/verify-engine.ps1 - make is needed only by that script's
+# upstream test-suite layer, never to build the engine
+# (scripts/build-pgn-extract.ps1 uses MSVC via vswhere and nothing else).
+#
+# Known macOS limitation (decisions ledger D-006): the `include_str!` in
+# (2) hardcodes the *Windows* build-info filename, and
+# engine::sidecar's tests assert a Windows `binaries\...exe` path, so the
+# crate cannot compile on macOS at all yet - no sidecar build is attempted
+# there, and those jobs stay `continue-on-error` until a macOS build-info
+# plus `cfg!`-based selection exists.
 name: Rust
 
 on:
@@ -61,6 +104,16 @@ jobs:
       - name: Format check (cargo fmt)
         run: cargo fmt --check
 
+      # Deliberately after `cargo fmt` (which needs no build at all, so a
+      # formatting slip still fails in seconds) and before every step that
+      # does compile the crate. See this file's header for why the sidecar
+      # is a hard build-time prerequisite rather than an optional extra.
+      - name: Build the pinned pgn-extract sidecar (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: ./scripts/build-pgn-extract.ps1
+
       - name: Lint (Clippy, warnings denied)
         run: cargo clippy --all-targets -- -D warnings
 
@@ -72,11 +125,13 @@ jobs:
         # which shells out to the real `pgn-studio` binary with
         # `--export-bindings` - see src-tauri/src/lib.rs::run's doc comment
         # for why it does not link pgn_studio_lib into a second binary
-        # crate directly) and fails if the committed file would change. Runs
-        # on every OS in the matrix: it needs no engine sidecar and no GUI/
-        # webview initialization (the flag short-circuits before
-        # `tauri::Builder`/`application::startup::initialize` are ever
-        # constructed), so it is a genuinely portable, fast check.
+        # crate directly) and fails if the committed file would change.
+        # `--export-bindings` short-circuits before `tauri::Builder`/
+        # `application::startup::initialize` are ever constructed, so it
+        # needs no GUI/webview and never *executes* the engine - but it
+        # does have to compile the crate, so it still depends on the
+        # sidecar build above (build.rs's externalBin check and
+        # engine::capability's `include_str!`; see this file's header).
         run: |
           cargo run -p xtask -- export-bindings
           git diff --exit-code -- ../src/ipc/generated-types.ts
