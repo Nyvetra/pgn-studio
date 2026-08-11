@@ -184,11 +184,40 @@ mod tests {
         }
     }
 
+    // Windows-only by construction, not for convenience. The non-Windows
+    // arm of `paths_equal_case_folded` is byte-exact *on purpose* (see that
+    // function's doc comment and DECISIONS-LEDGER.md D-006: with no Mac to
+    // verify against, guessing at ICU-grade NFC normalization and
+    // APFS/HFS+ case-folding was judged riskier than clearly leaving it
+    // unimplemented). Running this assertion on macOS would demand a
+    // behaviour the project has deliberately not implemented.
+    #[cfg(windows)]
     #[test]
     fn case_folded_equality_is_case_insensitive_on_windows_paths() {
         let a = Path::new(r"C:\Games\Out.pgn");
         let b = Path::new(r"c:\games\out.PGN");
         assert!(paths_equal_case_folded(a, b));
+    }
+
+    /// The documented gap, asserted rather than left silent - the same
+    /// "documented, non-silent skip" pattern D-006 establishes elsewhere
+    /// (see `filesystem::folder_scan`'s symlink test). Off Windows the
+    /// comparison is byte-exact, so two paths differing only in case are
+    /// **not** equal.
+    ///
+    /// If this test ever starts failing, someone has implemented
+    /// case-folding for this platform: update `paths_equal_case_folded`'s
+    /// doc comment and D-006 to match, rather than deleting this.
+    #[cfg(not(windows))]
+    #[test]
+    fn case_folded_equality_is_byte_exact_off_windows() {
+        let a = Path::new("/games/Out.pgn");
+        let b = Path::new("/games/out.PGN");
+        assert!(
+            !paths_equal_case_folded(a, b),
+            "off Windows this comparison is byte-exact by design (D-006); \
+             case-insensitivity here would be an unverified guess at APFS/HFS+ semantics"
+        );
     }
 
     #[test]

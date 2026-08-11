@@ -18,10 +18,61 @@ use crate::engine::capability::pinned_v26_06;
 use crate::engine::command_compiler::{compile, CompileError, CompileLayout};
 use crate::engine::EngineExecutable;
 
-const ENGINE_PATH: &str = r"C:\engine\pgn-extract.exe";
-const WORKSPACE_ROOT: &str = r"C:\ws\job";
-const ECO_FILE: &str = r"C:\resources\pgn-extract\eco.pgn";
-const DEST_DIR: &str = r"C:\dest";
+// Absolute fixture roots, spelled per platform. `compile` runs
+// `validate_structural` first, which rejects any input path that is not
+// `Path::is_absolute()` - and `C:\in\a.pgn` is a *relative*
+// single-component path on Unix. So a Windows-only literal here would not
+// merely look out of place on macOS: every test would take the
+// InvalidSpec path instead of the scenario it is supposed to exercise.
+#[cfg(windows)]
+mod roots {
+    pub const ENGINE_PATH: &str = r"C:\engine\pgn-extract.exe";
+    pub const WORKSPACE_ROOT: &str = r"C:\ws\job";
+    pub const ECO_FILE: &str = r"C:\resources\pgn-extract\eco.pgn";
+    pub const DEST_DIR: &str = r"C:\dest";
+    pub const IN_DIR: &str = r"C:\in";
+    pub const MASTER_FILE: &str = r"C:\master\master.pgn";
+    /// Spaces, an ampersand, parentheses and Bengali script in one path -
+    /// design-02 §1.8 G-11's own example.
+    pub const TORTURE_PATH: &str = r"C:\t t\a&b(1)\ঢাকা.pgn";
+}
+
+#[cfg(not(windows))]
+mod roots {
+    pub const ENGINE_PATH: &str = "/engine/pgn-extract";
+    pub const WORKSPACE_ROOT: &str = "/ws/job";
+    pub const ECO_FILE: &str = "/resources/pgn-extract/eco.pgn";
+    pub const DEST_DIR: &str = "/dest";
+    pub const IN_DIR: &str = "/in";
+    pub const MASTER_FILE: &str = "/master/master.pgn";
+    /// Deliberately the same character classes as the Windows fixture -
+    /// space, ampersand, parentheses, Bengali script - so G-11 asserts the
+    /// same property on both platforms rather than a weaker one here.
+    pub const TORTURE_PATH: &str = "/t t/a&b(1)/ঢাকা.pgn";
+}
+
+use roots::*;
+
+/// Builds an expected path by pushing components one at a time, so the
+/// separator is the platform's own and the expectation is produced by the
+/// same path arithmetic the compiler uses (`PathBuf::join`) rather than
+/// restated with a hardcoded separator that only matches on Windows.
+///
+/// Components must be pushed individually: `join("criteria/tags.txt")`
+/// keeps the embedded forward slash verbatim on Windows and would not
+/// match `join("criteria").join("tags.txt")`.
+fn under(root: &str, components: &[&str]) -> String {
+    let mut path = PathBuf::from(root);
+    for component in components {
+        path.push(component);
+    }
+    path.to_string_lossy().into_owned()
+}
+
+/// The standard input fixture path, `IN_DIR/<name>`.
+fn in_file(name: &str) -> String {
+    under(IN_DIR, &[name])
+}
 
 fn layout() -> CompileLayout {
     CompileLayout {
@@ -95,30 +146,39 @@ fn base_spec(id: Uuid, inputs: Vec<InputFile>) -> JobSpec {
 }
 
 fn tmpu(id: Uuid) -> String {
-    format!(
-        r"{DEST_DIR}\.pgnstudio-tmp-{}-unique.pgn",
-        &id.simple().to_string()[..12]
+    under(
+        DEST_DIR,
+        &[&format!(
+            ".pgnstudio-tmp-{}-unique.pgn",
+            &id.simple().to_string()[..12]
+        )],
     )
 }
 
 fn tmpd(id: Uuid) -> String {
-    format!(
-        r"{DEST_DIR}\.pgnstudio-tmp-{}-duplicates.pgn",
-        &id.simple().to_string()[..12]
+    under(
+        DEST_DIR,
+        &[&format!(
+            ".pgnstudio-tmp-{}-duplicates.pgn",
+            &id.simple().to_string()[..12]
+        )],
     )
 }
 
 #[test]
 fn g1_merge_two_files() {
     let id = Uuid::from_u128(1);
-    let spec = base_spec(id, vec![input(r"C:\in\a.pgn", 0), input(r"C:\in\b.pgn", 1)]);
+    let spec = base_spec(
+        id,
+        vec![input(&in_file("a.pgn"), 0), input(&in_file("b.pgn"), 1)],
+    );
     let compiled = compile(&spec, &pinned_v26_06(), &layout()).unwrap();
     let expected: Vec<OsString> = vec![
         OsString::from("-s"),
         OsString::from("--summary"),
         OsString::from(format!("-o{}", tmpu(id))),
-        OsString::from(r"C:\in\a.pgn"),
-        OsString::from(r"C:\in\b.pgn"),
+        OsString::from(in_file("a.pgn")),
+        OsString::from(in_file("b.pgn")),
     ];
     assert_eq!(compiled.args, expected);
 }
@@ -126,7 +186,10 @@ fn g1_merge_two_files() {
 #[test]
 fn g2_clean_collection_dedupe_and_audit() {
     let id = Uuid::from_u128(2);
-    let mut spec = base_spec(id, vec![input(r"C:\in\a.pgn", 0), input(r"C:\in\b.pgn", 1)]);
+    let mut spec = base_spec(
+        id,
+        vec![input(&in_file("a.pgn"), 0), input(&in_file("b.pgn"), 1)],
+    );
     spec.operations.duplicates = DuplicatePolicy::ReportAndKeepFirst;
     spec.output.duplicate_games = DuplicateOutput::Audit;
     let compiled = compile(&spec, &pinned_v26_06(), &layout()).unwrap();
@@ -135,8 +198,8 @@ fn g2_clean_collection_dedupe_and_audit() {
         OsString::from("--summary"),
         OsString::from(format!("-d{}", tmpd(id))),
         OsString::from(format!("-o{}", tmpu(id))),
-        OsString::from(r"C:\in\a.pgn"),
-        OsString::from(r"C:\in\b.pgn"),
+        OsString::from(in_file("a.pgn")),
+        OsString::from(in_file("b.pgn")),
     ];
     assert_eq!(compiled.args, expected);
 }
@@ -144,7 +207,10 @@ fn g2_clean_collection_dedupe_and_audit() {
 #[test]
 fn g3_suppress_duplicates_no_audit() {
     let id = Uuid::from_u128(3);
-    let mut spec = base_spec(id, vec![input(r"C:\in\a.pgn", 0), input(r"C:\in\b.pgn", 1)]);
+    let mut spec = base_spec(
+        id,
+        vec![input(&in_file("a.pgn"), 0), input(&in_file("b.pgn"), 1)],
+    );
     spec.operations.duplicates = DuplicatePolicy::SuppressKeepFirst;
     let compiled = compile(&spec, &pinned_v26_06(), &layout()).unwrap();
     let expected: Vec<OsString> = vec![
@@ -152,8 +218,8 @@ fn g3_suppress_duplicates_no_audit() {
         OsString::from("--summary"),
         OsString::from("-D"),
         OsString::from(format!("-o{}", tmpu(id))),
-        OsString::from(r"C:\in\a.pgn"),
-        OsString::from(r"C:\in\b.pgn"),
+        OsString::from(in_file("a.pgn")),
+        OsString::from(in_file("b.pgn")),
     ];
     assert_eq!(compiled.args, expected);
 }
@@ -161,7 +227,7 @@ fn g3_suppress_duplicates_no_audit() {
 #[test]
 fn g4_minimal_mainline_dedupe_and_strip() {
     let id = Uuid::from_u128(4);
-    let mut spec = base_spec(id, vec![input(r"C:\in\a.pgn", 0)]);
+    let mut spec = base_spec(id, vec![input(&in_file("a.pgn"), 0)]);
     spec.operations.duplicates = DuplicatePolicy::SuppressKeepFirst;
     spec.operations.cleanup.remove_comments = true;
     spec.operations.cleanup.remove_nags = true;
@@ -175,7 +241,7 @@ fn g4_minimal_mainline_dedupe_and_strip() {
         OsString::from("-N"),
         OsString::from("-V"),
         OsString::from(format!("-o{}", tmpu(id))),
-        OsString::from(r"C:\in\a.pgn"),
+        OsString::from(in_file("a.pgn")),
     ];
     assert_eq!(compiled.args, expected);
 }
@@ -183,7 +249,7 @@ fn g4_minimal_mainline_dedupe_and_strip() {
 #[test]
 fn g5_validate_only() {
     let id = Uuid::from_u128(5);
-    let mut spec = base_spec(id, vec![input(r"C:\in\a.pgn", 0)]);
+    let mut spec = base_spec(id, vec![input(&in_file("a.pgn"), 0)]);
     spec.operations.mode = JobMode::ValidateOnly;
     spec.output.unique_games = false;
     let compiled = compile(&spec, &pinned_v26_06(), &layout()).unwrap();
@@ -191,7 +257,7 @@ fn g5_validate_only() {
         OsString::from("-s"),
         OsString::from("--summary"),
         OsString::from("-r"),
-        OsString::from(r"C:\in\a.pgn"),
+        OsString::from(in_file("a.pgn")),
     ];
     assert_eq!(compiled.args, expected);
 }
@@ -199,7 +265,7 @@ fn g5_validate_only() {
 #[test]
 fn g6_add_eco() {
     let id = Uuid::from_u128(6);
-    let mut spec = base_spec(id, vec![input(r"C:\in\a.pgn", 0)]);
+    let mut spec = base_spec(id, vec![input(&in_file("a.pgn"), 0)]);
     spec.operations.eco.enabled = true;
     let compiled = compile(&spec, &pinned_v26_06(), &layout()).unwrap();
     let expected: Vec<OsString> = vec![
@@ -207,7 +273,7 @@ fn g6_add_eco() {
         OsString::from("--summary"),
         OsString::from(format!("-e{ECO_FILE}")),
         OsString::from(format!("-o{}", tmpu(id))),
-        OsString::from(r"C:\in\a.pgn"),
+        OsString::from(in_file("a.pgn")),
     ];
     assert_eq!(compiled.args, expected);
 }
@@ -215,7 +281,7 @@ fn g6_add_eco() {
 #[test]
 fn g7_tal_games_1960_1969() {
     let id = Uuid::from_u128(7);
-    let mut spec = base_spec(id, vec![input(r"C:\in\a.pgn", 0)]);
+    let mut spec = base_spec(id, vec![input(&in_file("a.pgn"), 0)]);
     spec.filters.tag_rules = vec![
         TagRule {
             tag: TagName::Player,
@@ -237,9 +303,12 @@ fn g7_tal_games_1960_1969() {
     let expected: Vec<OsString> = vec![
         OsString::from("-s"),
         OsString::from("--summary"),
-        OsString::from(format!(r"-t{WORKSPACE_ROOT}\criteria\tags.txt")),
+        OsString::from(format!(
+            "-t{}",
+            under(WORKSPACE_ROOT, &["criteria", "tags.txt"])
+        )),
         OsString::from(format!("-o{}", tmpu(id))),
-        OsString::from(r"C:\in\a.pgn"),
+        OsString::from(in_file("a.pgn")),
     ];
     assert_eq!(compiled.args, expected);
 
@@ -257,7 +326,7 @@ fn g7_tal_games_1960_1969() {
 #[test]
 fn g8_move_bounds_30_40_order_regression() {
     let id = Uuid::from_u128(8);
-    let mut spec = base_spec(id, vec![input(r"C:\in\a.pgn", 0)]);
+    let mut spec = base_spec(id, vec![input(&in_file("a.pgn"), 0)]);
     let bounds = MoveBounds {
         min: Some(30),
         max: Some(40),
@@ -272,7 +341,7 @@ fn g8_move_bounds_30_40_order_regression() {
         OsString::from("--minmoves"),
         OsString::from("30"),
         OsString::from(format!("-o{}", tmpu(id))),
-        OsString::from(r"C:\in\a.pgn"),
+        OsString::from(in_file("a.pgn")),
     ];
     assert_eq!(compiled.args, expected);
 
@@ -311,17 +380,17 @@ fn g8_move_bounds_30_40_order_regression() {
 #[test]
 fn g9_new_games_against_master() {
     let id = Uuid::from_u128(9);
-    let mut spec = base_spec(id, vec![input(r"C:\in\a.pgn", 0)]);
+    let mut spec = base_spec(id, vec![input(&in_file("a.pgn"), 0)]);
     spec.operations.duplicates = DuplicatePolicy::SuppressKeepFirst;
-    spec.operations.check_file = Some(PathBuf::from(r"C:\master\master.pgn"));
+    spec.operations.check_file = Some(PathBuf::from(MASTER_FILE));
     let compiled = compile(&spec, &pinned_v26_06(), &layout()).unwrap();
     let expected: Vec<OsString> = vec![
         OsString::from("-s"),
         OsString::from("--summary"),
         OsString::from("-D"),
-        OsString::from(r"-cC:\master\master.pgn"),
+        OsString::from(format!("-c{MASTER_FILE}")),
         OsString::from(format!("-o{}", tmpu(id))),
-        OsString::from(r"C:\in\a.pgn"),
+        OsString::from(in_file("a.pgn")),
     ];
     assert_eq!(compiled.args, expected);
 }
@@ -329,7 +398,7 @@ fn g9_new_games_against_master() {
 #[test]
 fn g10_external_table_and_audit() {
     let id = Uuid::from_u128(10);
-    let mut spec = base_spec(id, vec![input(r"C:\in\a.pgn", 0)]);
+    let mut spec = base_spec(id, vec![input(&in_file("a.pgn"), 0)]);
     spec.runtime.use_external_duplicate_table = true;
     spec.operations.duplicates = DuplicatePolicy::ReportAndKeepFirst;
     spec.output.duplicate_games = DuplicateOutput::Audit;
@@ -340,7 +409,7 @@ fn g10_external_table_and_audit() {
         OsString::from("-Z"),
         OsString::from(format!("-d{}", tmpd(id))),
         OsString::from(format!("-o{}", tmpu(id))),
-        OsString::from(r"C:\in\a.pgn"),
+        OsString::from(in_file("a.pgn")),
     ];
     assert_eq!(compiled.args, expected);
 }
@@ -349,8 +418,10 @@ fn g10_external_table_and_audit() {
 fn g11_windows_path_torture() {
     let id = Uuid::from_u128(11);
     // Spaces, an ampersand, parentheses, and Bengali script, all in one
-    // path — design-02 §1.8 G-11's own example.
-    let torture_path = r"C:\t t\a&b(1)\ঢাকা.pgn";
+    // path — design-02 §1.8 G-11's own example. Name kept as G-11 for
+    // traceability to that section; the fixture itself is per-platform
+    // (see `roots`) so the same property is asserted on macOS.
+    let torture_path = TORTURE_PATH;
     let spec = base_spec(id, vec![input(torture_path, 0)]);
     let compiled = compile(&spec, &pinned_v26_06(), &layout()).unwrap();
 
@@ -368,7 +439,7 @@ fn g11_windows_path_torture() {
 #[test]
 fn g12_unsupported_output_notation_produces_no_argv() {
     let id = Uuid::from_u128(12);
-    let mut spec = base_spec(id, vec![input(r"C:\in\a.pgn", 0)]);
+    let mut spec = base_spec(id, vec![input(&in_file("a.pgn"), 0)]);
     spec.operations.output_notation = OutputNotation::Uci;
     let result = compile(&spec, &pinned_v26_06(), &layout());
     match result {
