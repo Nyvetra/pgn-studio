@@ -10,7 +10,7 @@ Lucena or any other chess application.
 > and accessible through a transparent desktop interface.
 
 The full product and technical direction lives in
-[`PGN-Studio-architecture.md`](./PGN-Studio-architecture.md). Read that
+[`architecture.md`](./docs/architecture.md). Read that
 document first - this README only orients you.
 
 ## Project status
@@ -32,7 +32,7 @@ macOS application bundles on both Apple Silicon and Intel. The Intel
 runners, not a fault here — so that leg occasionally goes red. See
 [`docs/release-process.md`](./docs/release-process.md),
 [`docs/acceptance-criteria.md`](./docs/acceptance-criteria.md), and
-[`DECISIONS-LEDGER.md`](./DECISIONS-LEDGER.md) D-006 for the precise,
+[`DECISIONS-LEDGER.md`](./docs/DECISIONS-LEDGER.md) D-006 for the precise,
 honest breakdown of what is verified versus what is not.
 
 As of this phase: 300+ Rust tests and 230+ frontend tests passing,
@@ -117,7 +117,7 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full development,
+See [`CONTRIBUTING.md`](./.github/CONTRIBUTING.md) for the full development,
 testing, and lint workflow.
 
 ## Repository layout
@@ -154,9 +154,9 @@ attribution, including the honest provenance note for the bundled
 
 ## Security
 
-See [`SECURITY.md`](./SECURITY.md) for how to report a vulnerability.
+See [`SECURITY.md`](./.github/SECURITY.md) for how to report a vulnerability.
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md) and
-[`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md).
+See [`CONTRIBUTING.md`](./.github/CONTRIBUTING.md) and
+[`CODE_OF_CONDUCT.md`](./.github/CODE_OF_CONDUCT.md).

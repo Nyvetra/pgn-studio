@@ -314,17 +314,14 @@ Recommended monorepo structure:
 ```text
 pgn-studio/
 ├── README.md
-├── architecture.md
-├── CONTRIBUTING.md
-├── CODE_OF_CONDUCT.md
-├── SECURITY.md
-├── LICENSE
 ├── THIRD_PARTY_NOTICES.md
+├── LICENSE
 ├── package.json
 ├── package-lock.json
 ├── vite.config.ts
 ├── tsconfig.json
 ├── index.html
+├── rust-toolchain.toml
 ├── src/
 │   ├── app/
 │   │   ├── App.tsx
@@ -383,6 +380,7 @@ pgn-studio/
 ├── engine-src/
 │   ├── README.md
 │   ├── upstream.lock
+│   ├── eco-json/
 │   └── patches/
 ├── fixtures/
 │   ├── valid/
@@ -396,14 +394,21 @@ pgn-studio/
 │   ├── generate-notices.*
 │   └── package-release.*
 ├── docs/
+│   ├── README.md
+│   ├── architecture.md
+│   ├── DECISIONS-LEDGER.md
 │   ├── user-guide.md
 │   ├── engine-capabilities.md
 │   ├── duplicate-semantics.md
+│   ├── acceptance-criteria.md
 │   └── release-process.md
 └── .github/
     ├── workflows/
     ├── ISSUE_TEMPLATE/
-    └── PULL_REQUEST_TEMPLATE.md
+    ├── PULL_REQUEST_TEMPLATE.md
+    ├── CONTRIBUTING.md
+    ├── CODE_OF_CONDUCT.md
+    └── SECURITY.md
 ```
 
 Do not commit undocumented third-party binaries. Every bundled binary must correspond to a recorded upstream revision and checksum.

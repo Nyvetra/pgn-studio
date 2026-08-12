@@ -258,6 +258,110 @@ darwin toolchains — deliberately the string `"builds"`, not `true`.
 
 ---
 
+## D-014 — Repository reorganization: doc relocation, `.github/` policy files, toolchain pinning
+
+**Status:** active.
+
+> **On this ID.** Numbered D-014 — above every ID known to be in use — and
+> not D-011, deliberately. Citations in the tree reach D-013, so the
+> original ledger almost certainly also used D-011 and D-012; they are
+> simply not cited by any surviving file. Reusing a number that a lost
+> entry may already hold would silently create two different D-011s, which
+> is precisely the citation drift the provenance note above exists to
+> prevent. When the earlier entries are reconstructed, expect gaps at
+> D-001, D-003–D-005, D-011 and D-012 rather than assuming they were free.
+
+### Decision
+
+An approved repository reorganization moved five root-level files with
+history preserved (`git mv`), added two new pinning files, and closed a
+gitignore gap that only worked on one machine:
+
+- **The root-level architecture document (formerly named with a
+  redundant `PGN-Studio-` prefix) moved to `docs/architecture.md`,
+  renamed to match.** This file's own §8 (this section) prescribes the
+  filename `architecture.md`, and the ~424 existing short-form citations
+  across the tree already read "architecture.md §N" with no path, so this
+  move made the great majority of citations correct rather than requiring
+  them to be edited. Only the handful of citations that spelled out the
+  old, prefixed filename verbatim, or linked to it by relative path,
+  needed a change — see Evidence.
+- **`DECISIONS-LEDGER.md` → `docs/DECISIONS-LEDGER.md`.** This file's own
+  ~42 citations across the tree are almost entirely by name
+  ("DECISIONS-LEDGER.md D-007"), not by path, so the move did not require
+  editing them either. The filename itself did **not** change, unlike
+  `architecture.md` above.
+- **`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` → `.github/`.**
+  GitHub recognizes all three identically whether they sit at the repo
+  root or under `.github/`; consolidating them there declutters the root
+  without losing any platform behavior (auto-linking from the Issues/PRs
+  UI, the community-health-files tab, etc.).
+- **New `rust-toolchain.toml` (repo root).** Pins the exact Rust `stable`
+  channel this project was built and verified against, plus the
+  `rustfmt`/`clippy` components. Without a pin, two development machines
+  (or a machine and CI) can silently disagree on which lints `cargo
+  clippy -- -D warnings` enforces, since clippy's lint set changes across
+  stable releases — see the file's own header comment.
+- **New `package.json` `engines.node` field (`>=24`).** Documents, in the
+  one place a Node tool would actually check it, that CI pins Node 24; no
+  `.nvmrc` was added since `engines` already states the constraint.
+- **`.gitignore` gains `.claude/worktrees/`.** This directory holds full,
+  separate checkouts of this repository (each with its own `.git`,
+  `node_modules`, and built sidecar). It was previously excluded only via
+  the primary clone's local `.git/info/exclude`, which is machine-local
+  and does not travel with the repository — so on a second machine,
+  `git add -A` would attempt to commit an entire embedded checkout.
+  `.claude/` itself is deliberately **not** ignored wholesale:
+  `.claude/skills/` and `.claude/launch.json` remain tracked.
+- **This section (§8) was amended in the same change** that performed the
+  moves above, so the repository-layout tree it shows is never out of
+  date with respect to its own reorganization — see Evidence.
+
+### Evidence
+
+- `docs/architecture.md` §8 (this section) — the amended tree now shows
+  `docs/architecture.md`, `docs/DECISIONS-LEDGER.md`, `.github/CONTRIBUTING.md`,
+  `.github/CODE_OF_CONDUCT.md`, `.github/SECURITY.md`, `rust-toolchain.toml`,
+  and `engine-src/eco-json/`, and no longer shows any of those files at
+  the repository root nor a root `data/` directory (moved to
+  `engine-src/eco-json/` in an earlier, separate change).
+- `rust-toolchain.toml:1-11` — the pin and its rationale comment.
+- `package.json` — `engines.node` field.
+- `.gitignore` — the `.claude/worktrees/` block and its comment explaining
+  the local-exclude gap.
+- `.github/CONTRIBUTING.md` — the new "macOS" development subsection
+  (alongside the existing "Windows" one), covering the Xcode Command Line
+  Tools prerequisite, the PowerShell 7 requirement for
+  `scripts/verify-engine.ps1`, the sidecar-before-Rust build ordering
+  shared by both platforms, the `ENGINE_TAMPERED` rebuild-ordering hazard,
+  cross-machine sidecar hash differences being expected (cross-referencing
+  `engine-src/README.md`'s "What `/Brepro` does not fix"), `.gitattributes`
+  already forcing LF so `core.autocrlf` needs no per-machine fix, and
+  `git update-index --chmod=+x` for `.sh` files authored from Windows.
+- `README.md`, `.github/CONTRIBUTING.md`, `docs/user-guide.md`,
+  `docs/README.md`, `docs/acceptance-criteria.md`,
+  `.github/PULL_REQUEST_TEMPLATE.md`, `.github/ISSUE_TEMPLATE/feature_request.md`,
+  `.github/SECURITY.md` — the nine sites across eight files that spelled
+  out the old, `PGN-Studio-`-prefixed filename verbatim and were updated
+  to `architecture.md` (or a corrected relative link) as part of this
+  move.
+
+### Consequences
+
+- Root markdown is now exactly `README.md` and `THIRD_PARTY_NOTICES.md`;
+  every other project markdown file lives under `docs/` or `.github/`.
+- Any future citation of `architecture.md` or `DECISIONS-LEDGER.md` by
+  name (the repository-wide convention) continues to resolve without a
+  path, since neither citation style encodes a directory. A citation that
+  needs an actual link must point into `docs/`.
+- A future `.github/CONTRIBUTING.md` edit that discusses either OS-specific
+  setup path should keep the "Windows" / "macOS" subsections symmetric
+  rather than letting one drift out of date while the other is updated.
+- `git status --short` for this change reports the five moved files as
+  renames (`R`), not delete+add, because every move used `git mv`.
+
+---
+
 ## Cited but not recorded
 
 These IDs are cited in the tree and have no entry here. They are listed

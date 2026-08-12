@@ -3,7 +3,7 @@
 ## Project status
 
 PGN Studio is pre-release (Phase 0 of the implementation plan in
-`PGN-Studio-architecture.md` §24). There are no published binary releases
+`architecture.md` §24). There are no published binary releases
 yet, so there is currently only one supported line: the `main` branch.
 This policy will be revised once versioned releases exist.
 
