@@ -176,8 +176,8 @@ version of both entries above, including file checksums.
   covering opening lines `eco.pgn` does not classify at all.
 - **Upstream repository:** <https://github.com/hayatbiralem/eco.json>
 - **License:** MIT (declared by the repository; notice reproduced below).
-- **Vendored at:** `data/eco-json/ecoA.json` ... `ecoE.json` (five volume
-  files, SHA-256 recorded in
+- **Vendored at:** `engine-src/eco-json/ecoA.json` ... `ecoE.json` (five
+  volume files, SHA-256 recorded in
   `src-tauri/resources/eco-supplement/SOURCE.json`). These are build
   inputs and are **not** shipped in the application bundle.
 - **Upstream commit: not yet pinned.** The files were supplied as a local
