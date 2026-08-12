@@ -25,32 +25,32 @@
     "aggregatedSourcesNote": "Each entry in the dataset carries its own `src` field naming which of the above it came from. In the 10642 entries actually used by the supplement the breakdown is: scid=7860, eco_tsv=1949, wiki_b=560, chessGraph=153, eco_js=48, ct=45, eco_wikip.g=12, pgn=9, eco_wikip=4, icsbot=2. PGN Studio redistributes the derived supplement under the upstream MIT license; the MIT notice is reproduced in THIRD_PARTY_NOTICES.md."
   },
   "vendored": {
-    "path": "data/eco-json/",
+    "path": "engine-src/eco-json/",
     "commit": null,
     "commitNote": "NOT YET RECORDED. The files were provided as a local download rather than a verified checkout, so no upstream commit/tag is pinned. Before release, re-fetch from the repository at a known commit, confirm the SHA-256 values below still match, and fill this field in - matching the pin-and-verify discipline resources/pgn-extract/SOURCE.json applies to the engine.",
     "files": [
       {
-        "path": "data/eco-json/ecoA.json",
+        "path": "engine-src/eco-json/ecoA.json",
         "sha256": "2b43e348e4d16cf4ab9b91053ba60f65ab4d486931c6204f361736ec0149fc0a",
         "bytes": 873569
       },
       {
-        "path": "data/eco-json/ecoB.json",
+        "path": "engine-src/eco-json/ecoB.json",
         "sha256": "b95245d3e2a2dae2bcb0cd7cbdc04450bce6e6cea22298700c53caf1ad2d44ed",
         "bytes": 954270
       },
       {
-        "path": "data/eco-json/ecoC.json",
+        "path": "engine-src/eco-json/ecoC.json",
         "sha256": "4762fcd896d43a21469e118d7d88e60e45d4ecbbe4e12d790783b401764900bc",
         "bytes": 1131107
       },
       {
-        "path": "data/eco-json/ecoD.json",
+        "path": "engine-src/eco-json/ecoD.json",
         "sha256": "f946e346a2b798ded4620b83deda0fd45a4bf705124da6d8a30ec51ee17c8b51",
         "bytes": 806257
       },
       {
-        "path": "data/eco-json/ecoE.json",
+        "path": "engine-src/eco-json/ecoE.json",
         "sha256": "5f7db27d82f8f5c87236c0a86da17d055176bdff85d53be9c6c002e3b9c4697f",
         "bytes": 629398
       }

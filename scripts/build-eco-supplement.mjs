@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Regenerates `src-tauri/resources/eco-supplement/eco-supplement.pgn` from
-// the vendored MIT-licensed `data/eco-json/` dataset.
+// the vendored MIT-licensed `engine-src/eco-json/` dataset.
 //
 // WHAT THIS DOES NOT DO: it never reads, writes, or modifies
 // `src-tauri/resources/pgn-extract/eco.pgn` beyond opening it read-only to
@@ -31,7 +31,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const JSON_DIR = path.join(REPO_ROOT, "data", "eco-json");
+const JSON_DIR = path.join(REPO_ROOT, "engine-src", "eco-json");
 const ECO_PGN = path.join(REPO_ROOT, "src-tauri", "resources", "pgn-extract", "eco.pgn");
 const OUT_FILE = path.join(
   REPO_ROOT,
@@ -149,6 +149,14 @@ function build() {
     (a, b) => a.eco.localeCompare(b.eco) || a.plies - b.plies || a.key.localeCompare(b.key),
   );
 
+  // NOTE: this template is compared byte-for-byte against the committed
+  // eco-supplement.pgn by --check, so editing anything below REQUIRES
+  // regenerating the file in the same change - otherwise --check
+  // immediately reports the committed output as stale. That is a reason to
+  // regenerate, never a reason to leave a wrong path here: this header is
+  // the shipped file's own provenance record, and pointing it at a
+  // directory that no longer exists is the exact drift --check exists to
+  // prevent.
   const header = `{
 PGN Studio ECO supplement - GENERATED FILE, DO NOT EDIT BY HAND.
 Regenerate with: node scripts/build-eco-supplement.mjs
@@ -159,8 +167,8 @@ unmodified; see THIRD_PARTY_NOTICES.md and
 resources/pgn-extract/SOURCE.json.
 
 Derived from the MIT-licensed eco.json dataset
-(https://github.com/hayatbiralem/eco.json), vendored at data/eco-json/ and
-recorded in resources/eco-supplement/SOURCE.json.
+(https://github.com/hayatbiralem/eco.json), vendored at engine-src/eco-json/
+and recorded in resources/eco-supplement/SOURCE.json.
 
 This supplement contains ONLY opening lines the bundled eco.pgn does not
 classify at all - every line already present there was excluded when this
@@ -196,7 +204,7 @@ if (checkOnly) {
   }
   console.error(
     "eco-supplement.pgn is STALE or missing - it does not match what\n" +
-      "data/eco-json/ + eco.pgn currently produce.\n" +
+      "engine-src/eco-json/ + eco.pgn currently produce.\n" +
       "Run: node scripts/build-eco-supplement.mjs",
   );
   process.exit(1);
