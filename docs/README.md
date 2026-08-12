@@ -9,6 +9,7 @@ Project documentation, per the repository structure in architecture.md §8.
 | [`duplicate-semantics.md`](./duplicate-semantics.md) | Architecture.md §10.7's duplicate-detection semantics ("keep first copy," input order as retention priority) and the annotated-duplicate warning's exact meaning and limits. |
 | [`release-process.md`](./release-process.md) | How a release is built and verified end to end, including an honest accounting of what cannot be verified from a Windows-only development machine. |
 | [`acceptance-criteria.md`](./acceptance-criteria.md) | The project's own item-by-item self-assessment against architecture.md §25's MVP acceptance criteria - verified / not verified / not achievable here, with evidence for each. |
+| [`mac-setup.md`](./mac-setup.md) | First-run walkthrough for setting up the project on a Mac, in order, plus the traps that cost time on the first attempt. Written without access to Mac hardware and labelled as such - `.github/CONTRIBUTING.md` remains the authoritative contributor reference. |
 | `adr/` | Architecture Decision Records for choices made after `architecture.md` was written (architecture.md §26). Not yet populated. |
 
 All content above reflects the real, tested application as of Phase 6 -
