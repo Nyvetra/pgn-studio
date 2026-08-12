@@ -1,7 +1,7 @@
 # MVP acceptance criteria — self-assessment
 
 This is the project's own item-by-item assessment against
-`PGN-Studio-architecture.md` §25, written at the end of Phase 6 (the last
+`architecture.md` §25, written at the end of Phase 6 (the last
 planned MVP phase). Every item below is marked **Verified**, **Partially
 verified**, **Not verified**, or **Not achievable here**, each with the
 evidence behind that call. The rule followed while writing this: overstating

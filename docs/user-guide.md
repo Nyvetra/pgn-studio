@@ -4,7 +4,7 @@ PGN Studio is a desktop tool for merging, deduplicating, cleaning, and
 filtering PGN (chess game) files in bulk. This guide walks through the
 actual five-step workflow as it exists today. It does not cover a
 chessboard viewer, a game list/explorer, or a manual PGN editor — none of
-those exist in this version; see `PGN-Studio-architecture.md` §5 for what's
+those exist in this version; see `architecture.md` §5 for what's
 planned for later versions.
 
 Two promises worth knowing up front, because they shape everything below:

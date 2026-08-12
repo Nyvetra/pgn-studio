@@ -14,7 +14,7 @@ upstream help/documentation if you can.
 What you'd like to see happen.
 
 **Where does this fit in the roadmap?**
-PGN Studio is built in phases (see `PGN-Studio-architecture.md` §5 and
+PGN Studio is built in phases (see `architecture.md` §5 and
 §24). If you know roughly which stage this belongs to (Bulk Processing,
 Collection Explorer, Game Studio, or a specific numbered phase), say so -
 it helps triage. It's fine to leave this blank if you're not sure.

@@ -61,3 +61,14 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
+
+# --- Claude Code worktrees ------------------------------------------------
+# Each worktree under .claude/worktrees/ is a full, separate checkout of
+# this repository (its own .git, node_modules, built sidecar, etc.). It was
+# previously excluded only via the main clone's local .git/info/exclude,
+# which is machine-local and does not travel with the repo - so on another
+# machine `git add -A` would try to commit an entire embedded checkout.
+# Track this ignore rule in the repo instead. Do not broaden this to
+# `.claude/` as a whole: .claude/skills/ and .claude/launch.json are
+# intentionally tracked.
+.claude/worktrees/

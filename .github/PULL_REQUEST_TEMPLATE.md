@@ -2,13 +2,13 @@
 
 <!-- What does this change do, and why? -->
 
-## Which phase/section of PGN-Studio-architecture.md does this relate to?
+## Which phase/section of architecture.md does this relate to?
 
 <!-- e.g. "Phase 1: Engine adapter proof" or "§11.4 Atomic output publication" -->
 
 ## Checklist
 
-- [ ] I read the relevant section(s) of `PGN-Studio-architecture.md` before
+- [ ] I read the relevant section(s) of `architecture.md` before
       making this change.
 - [ ] `npm run build`, `npm test`, and `npm run lint` pass locally.
 - [ ] `cargo test`, `cargo clippy --all-targets -- -D warnings`, and

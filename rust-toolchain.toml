@@ -1,0 +1,11 @@
+# Pinned so the Windows development machine, any second machine, and CI
+# all compile and lint against the identical Rust toolchain. This matters
+# more than usual for this project because `cargo clippy -- -D warnings`
+# is part of the required check suite (see CONTRIBUTING.md and
+# .github/workflows/rust.yml), and clippy's lint set changes - sometimes
+# gaining newly-`deny`-by-default lints - with every stable release. An
+# unpinned toolchain can make `cargo clippy` pass on one machine and fail
+# on another (or in CI) for no reason related to the code itself.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]
